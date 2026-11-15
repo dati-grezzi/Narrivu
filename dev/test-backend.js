@@ -1,0 +1,117 @@
+'use strict';
+/* Test di Code.gs con servizi Google simulati.  Uso: node dev/test-backend.js */
+const fs = require('fs'), vm = require('vm'), path = require('path'), assert = require('assert');
+const code = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+
+const pad = n => String(n).padStart(2, '0');
+let clock = new Date(2026, 10, 15, 9, 0);
+const fmt = (d, f) => f.replace("yyyy", d.getFullYear()).replace("MM", pad(d.getMonth() + 1)).replace("dd", pad(d.getDate()))
+  .replace("HH", pad(d.getHours())).replace("mm", pad(d.getMinutes())).replace(/'/g, '');
+class FakeDate extends Date { constructor(...a) { a.length ? super(...a) : super(+clock); } static now() { return +clock; } }
+
+const sheets = {}; const props = {}; const sent = []; const triggers = [];
+function mkSheet(name) {
+  const rows = [];
+  const sh = {
+    name, rows,
+    getLastRow: () => rows.length, getLastColumn: () => (rows[0] || []).length,
+    getRange(r, c, nr = 1, nc = 1) {
+      const R = {
+        getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => (rows[r - 1 + i] || [])[c - 1 + j] ?? '')),
+        setValues: v => { v.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((x, j) => rows[r - 1 + i][c - 1 + j] = x); }); return R; },
+        setValue: x => { rows[r - 1] = rows[r - 1] || []; rows[r - 1][c - 1] = x; return R; },
+        setNumberFormat: () => R, setFontWeight: () => R, setBackground: () => R
+      };
+      return R;
+    },
+    appendRow: r => rows.push(r.slice()),
+    deleteRow: i => rows.splice(i - 1, 1),
+    setFrozenRows() {}, setColumnWidth() {}, autoResizeColumns() {}, getName: () => name,
+    getMaxRows: () => 1000
+  };
+  return sh;
+}
+const ss = {
+  getSheetByName: n => sheets[n] || null,
+  insertSheet: n => (sheets[n] = mkSheet(n)),
+  getSheets: () => Object.values(sheets),
+  deleteSheet() {}
+};
+const ctx = {
+  console, Date: FakeDate, Math, JSON, String, Number, Array, Object, RegExp, Error, parseInt, parseFloat, isNaN, encodeURIComponent,
+  Logger: { log: m => console.log('   [log]', m) },
+  SpreadsheetApp: { getActiveSpreadsheet: () => ss, getActive: () => ss, openById: () => ss },
+  PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, setProperties: o => Object.assign(props, o) }) },
+  LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {}, tryLock: () => true }) },
+  ContentService: { MimeType: { JSON: 'json' }, createTextOutput: t => ({ t, setMimeType() { return this; }, getContent() { return t; } }) },
+  Utilities: {
+    getUuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => (Math.random() * 16 | 0).toString(16)),
+    formatDate: (d, tz, f) => fmt(d, f)
+  },
+  Session: { getScriptTimeZone: () => 'Europe/Rome' },
+  ScriptApp: {
+    getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ABC/exec' }),
+    getProjectTriggers: () => triggers, deleteTrigger() {},
+    newTrigger: fn => { const t = { fn }; const b = { timeBased: () => b, everyMinutes: () => b, everyDays: () => b, atHour: () => b, nearMinute: () => b, create: () => (triggers.push(t), t) }; return b; }
+  },
+  UrlFetchApp: { fetch: (u, o) => { sent.push({ u, body: JSON.parse(o.payload) }); return { getResponseCode: () => 200, getContentText: () => '{}' }; } }
+};
+vm.createContext(ctx); vm.runInContext(code, ctx);
+const call = (req, post = true) => JSON.parse((post ? ctx.doPost({ postData: { contents: JSON.stringify(req) } }) : ctx.doGet({ parameter: req })).getContent());
+
+let n = 0; const t = (name, fn) => { try { fn(); console.log('ok  ', name); n++; } catch (e) { console.log('FAIL', name, '\n    ', e.message); process.exitCode = 1; } };
+
+ctx.setup();
+const TOKEN = props.TOKEN;
+t('setup crea schede, token e canale', () => {
+  ['Eventi', 'Scadenze', 'Promemoria', 'Spesa', 'Abituali'].forEach(k => assert(sheets[k], 'manca ' + k));
+  assert(TOKEN && TOKEN.length >= 20); assert(/^casa-/.test(props.NTFY_TOPIC));
+});
+t('token errato rifiutato', () => assert.strictEqual(call({ token: 'x', action: 'list' }, false).ok, false));
+t('list restituisce config e dati', () => { const r = call({ token: TOKEN, action: 'list' }, false); assert(r.ok && r.data.abituali.length > 0 && r.config.ntfyTopic); });
+t('evento: crea e modifica', () => {
+  const r = call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', titolo: 'Dentista', data: '2026-11-16', ora: '17:30', per: 'Eddie', autore: 'Lucia' } });
+  assert(r.ok && r.created);
+  call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', ora: '18:00' } });
+  const e = call({ token: TOKEN, action: 'list' }, false).data.eventi.find(x => x.id === 'ev001');
+  assert.strictEqual(e.ora, '18:00'); assert.strictEqual(e.titolo, 'Dentista'); assert.strictEqual(e.autore, 'Lucia');
+});
+t('validazione: persona, data, autore', () => {
+  assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '2026-11-16', per: 'Nonno', autore: 'Alfio' } }).ok, false);
+  assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '16/11', per: 'Famiglia', autore: 'Alfio' } }).ok, false);
+  assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '2026-11-16', per: 'Famiglia', autore: 'Pino' } }).ok, false);
+});
+t('spesa: niente doppioni, ricompare se già comprato', () => {
+  call({ token: TOKEN, action: 'upsert', tab: 'Spesa', row: { id: 'sp001', prodotto: 'Latte', autore: 'Alfio' } });
+  call({ token: TOKEN, action: 'upsert', tab: 'Spesa', row: { id: 'sp001', stato: 'comprato' } });
+  call({ token: TOKEN, action: 'upsert', tab: 'Spesa', row: { id: 'sp002', prodotto: 'latte', autore: 'Lucia' } });
+  const sp = call({ token: TOKEN, action: 'list' }, false).data.spesa;
+  assert.strictEqual(sp.length, 1); assert.strictEqual(sp[0].stato, 'da_comprare');
+});
+t('ops in batch + remove', () => {
+  const r = call({ token: TOKEN, action: 'ops', ops: [
+    { action: 'upsert', tab: 'Promemoria', row: { id: 'pr001', testo: 'Chiamare idraulico', quando: '2026-11-15T09:03', per: 'Famiglia', autore: 'Alfio' } },
+    { action: 'upsert', tab: 'Scadenze', row: { id: 'sc001', prodotto: 'Yogurt', scadenza: '2026-11-17', avviso_giorni: '2', autore: 'Lucia' } },
+    { action: 'remove', tab: 'Eventi', id: 'ev001' } ] });
+  assert(r.ok && r.results.length === 3);
+  assert.strictEqual(call({ token: TOKEN, action: 'list' }, false).data.eventi.length, 0);
+});
+t('checkReminders: invia una sola volta, solo se scaduto', () => {
+  sent.length = 0;
+  clock = new Date(2026, 10, 15, 9, 0); ctx.checkReminders(); assert.strictEqual(sent.length, 0, 'prima dell\'ora');
+  clock = new Date(2026, 10, 15, 9, 5); ctx.checkReminders(); assert.strictEqual(sent.length, 1);
+  assert(/idraulico/.test(sent[0].body.message + sent[0].body.title)); assert.strictEqual(sent[0].body.topic, props.NTFY_TOPIC);
+  ctx.checkReminders(); assert.strictEqual(sent.length, 1, 'doppio invio');
+});
+t('dailyJob: avvisa scadenza vicina, non due volte lo stesso giorno', () => {
+  sent.length = 0; clock = new Date(2026, 10, 15, 8, 10);
+  ctx.dailyJob(); const first = sent.length; assert(first >= 1, 'nessun avviso'); assert(sent.some(s => /Yogurt/.test(s.body.message)));
+  ctx.dailyJob(); assert.strictEqual(sent.length, first, 'duplicato');
+});
+t('dailyJob: scadenza consumata non avvisa', () => {
+  call({ token: TOKEN, action: 'upsert', tab: 'Scadenze', row: { id: 'sc001', consumato: 'si' } });
+  sent.length = 0; clock = new Date(2026, 10, 16, 8, 10); ctx.dailyJob();
+  assert(!sent.some(s => /Yogurt/.test(s.body.message)));
+});
+t('showSetup stampa i link', () => ctx.showSetup());
+console.log(n + ' test superati');
