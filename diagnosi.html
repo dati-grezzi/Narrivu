@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Narrivu · diagnosi</title>
+<style>body{font:16px/1.4 system-ui,sans-serif;background:#E3EDDE;color:#16424A;margin:0;padding:1rem;max-width:42rem}
+button{font:inherit;font-weight:700;background:#1E6670;color:#fff;border:0;border-radius:.8rem;padding:.8rem 1.2rem}
+pre{background:#F6FAF3;border-radius:.8rem;padding:.8rem;white-space:pre-wrap;word-break:break-all}</style></head>
+<body><h1>Narrivu · diagnosi</h1>
+<p>Apri questa pagina con lo stesso link di Narrivu (stesso <code>#api=…&amp;t=…</code>), poi premi il pulsante. Il token non viene mostrato né inviato altrove.</p>
+<p><button id="go">Prova il collegamento</button></p><pre id="out">In attesa…</pre>
+<script>
+const out=document.getElementById('out'),log=m=>out.textContent+=m+'\n';
+document.getElementById('go').onclick=async()=>{
+  out.textContent='';
+  const p=new URLSearchParams(location.hash.replace(/^#/,''));
+  const api=p.get('api'),t=p.get('t');
+  if(!api||!t){log('Manca #api=…&t=… nell\'indirizzo.');return;}
+  let u;try{u=new URL(api)}catch(e){log('Indirizzo API non valido: '+e.message);return;}
+  log('Indirizzo: '+u.origin+u.pathname.replace(/(.{14}).*(.{10})$/,'$1…$2'));
+  log('Finisce con: '+u.pathname.split('/').pop());
+  log('Browser: '+navigator.userAgent);
+  log('In linea: '+navigator.onLine);
+  u.searchParams.set('token',t);u.searchParams.set('action','list');u.searchParams.set('_',Date.now());
+  try{
+    const r=await fetch(u);
+    log('1) Richiesta normale: stato '+r.status+', tipo '+r.headers.get('content-type')+', reindirizzata: '+r.redirected);
+    const txt=await r.text();
+    log('   Risposta (inizio): '+txt.slice(0,160).replace(t,'***'));
+    try{const j=JSON.parse(txt);log('   JSON valido, ok='+j.ok+(j.error?' errore='+j.error:'')+(j.data?' eventi='+(j.data.eventi||[]).length:''));}catch(e){log('   NON è JSON: '+e.message);}
+  }catch(e){
+    log('1) Richiesta normale FALLITA: '+e.name+': '+e.message);
+    try{await fetch(u,{mode:'no-cors'});log('2) Senza controlli CORS: il server RISPONDE → il problema è CORS/risposta bloccata dal browser.');}
+    catch(e2){log('2) Anche senza CORS fallisce: '+e2.name+': '+e2.message+' → il server non è raggiungibile (rete, blocco, indirizzo).');}
+  }
+};
+</script></body></html>
