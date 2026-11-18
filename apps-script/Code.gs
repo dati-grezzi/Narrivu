@@ -137,6 +137,15 @@ function handle_(req) {
       case 'upsert': return json_(withLock_(function () { return upsert_(req.tab, req.row); }));
       case 'remove': return json_(withLock_(function () { return remove_(req.tab, req.id); }));
       case 'ops':    return json_(withLock_(function () { return runOps_(req.ops); }));
+      case 'setEmail': {
+        const list = String(req.emails || '').split(/[,;\s]+/).filter(Boolean);
+        if (!list.length || list.length > 6) return json_({ ok: false, error: 'Inserisci da 1 a 6 indirizzi email' });
+        const bad = list.filter(function (x) { return !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x); });
+        if (bad.length) return json_({ ok: false, error: 'Indirizzo non valido: ' + bad[0] });
+        const value = list.join(', ');
+        PropertiesService.getScriptProperties().setProperty('EMAIL_DESTINATARI', value);
+        return json_({ ok: true, emailDestinatari: value });
+      }
       case 'test': {
         const sent = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', {});
         return json_(sent ? { ok: true } : { ok: false, error: NOTIFICA_ERRORE_ || 'notifica non inviata' });

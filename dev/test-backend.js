@@ -71,6 +71,12 @@ t('setup crea schede, token e canale', () => {
 });
 t('token errato rifiutato', () => assert.strictEqual(call({ token: 'x', action: 'list' }, false).ok, false));
 t('list restituisce config e dati', () => { const r = call({ token: TOKEN, action: 'list' }, false); assert(r.ok && r.data.abituali.length > 0 && r.config.emailDestinatari); });
+t('setEmail: salva e valida', () => {
+  assert.strictEqual(call({ token: TOKEN, action: 'setEmail', emails: 'a@b.it, c@d.it' }, false).emailDestinatari, 'a@b.it, c@d.it');
+  assert(!call({ token: TOKEN, action: 'setEmail', emails: 'nonvalida' }, false).ok);
+  assert.strictEqual(props.EMAIL_DESTINATARI, 'a@b.it, c@d.it');
+  call({ token: TOKEN, action: 'setEmail', emails: 'casa@example.com' }, false);
+});
 t('evento: crea e modifica', () => {
   const r = call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', titolo: 'Dentista', data: '2026-11-16', ora: '17:30', per: 'Eddie', autore: 'Lucia' } });
   assert(r.ok && r.created);

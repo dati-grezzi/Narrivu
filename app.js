@@ -521,8 +521,9 @@ function openSettings() {
     noFocus: true,
     body: () => `${c.mode === 'display' ? '' : `<fieldset><legend>Chi sei</legend><div class="seg two">${AUTORI.map(a => `<label><input type="radio" name="who" value="${a}" ${c.autore === a ? 'checked' : ''}><span>${a}</span></label>`).join('')}</div></fieldset>`}
       <fieldset><legend>Notifiche</legend>
-        ${mail ? `<p class="hint">Le notifiche arrivano per email a <strong>${esc(mail)}</strong>.</p>
-        <div class="row-btns"><button type="button" class="btn" data-act="test-notify">Invia una prova</button></div>` : '<p class="hint">Nessun indirizzo email configurato: esegui setup() nello script.</p>'}
+        <label>Email che ricevono le notifiche<input name="emails" type="text" inputmode="email" autocomplete="off" ${c.mode === 'display' ? 'readonly' : ''} value="${esc(mail)}" placeholder="alfio@…, lucia@…"></label>
+        <p class="hint">Più indirizzi separati da virgola.</p>
+        ${c.mode === 'display' ? '' : '<div class="row-btns"><button type="button" class="btn" data-act="save-email">Salva email</button><button type="button" class="btn" data-act="test-notify">Invia una prova</button></div>'}
       </fieldset>
       ${c.mode === 'display' ? '' : `<fieldset><legend>Prodotti che finiscono spesso</legend>
         <div class="chips" id="usuals">${usualsHtml()}</div>
@@ -587,6 +588,13 @@ document.addEventListener('click', ev => {
     case 'add-usual': {
       const inp = $('input[name=nuovo_abituale]');
       if (inp && inp.value.trim()) { upsert('Abituali', { id: rid(), prodotto: inp.value.trim() }); inp.value = ''; refreshSettingsList(); }
+      break;
+    }
+    case 'save-email': {
+      const inp = $('input[name=emails]');
+      apiPost({ action: 'setEmail', emails: inp ? inp.value : '' })
+        .then(r => { if (r.ok) { state.config.emailDestinatari = r.emailDestinatari; persist(); if (inp) inp.value = r.emailDestinatari; toast('Email salvate.'); } else toast(r.error || 'Non salvato.'); })
+        .catch(() => toast('Nessuna rete.'));
       break;
     }
     case 'test-notify': apiPost({ action: 'test' }).then(r => toast(r.ok ? 'Prova inviata.' : 'Non riesco a inviare: ' + (r.error || 'controlla lo script.'))).catch(() => toast('Nessuna rete.')); break;
