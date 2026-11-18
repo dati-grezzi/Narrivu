@@ -7,7 +7,7 @@ const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
-const VERSION = 'v16'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v17'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
