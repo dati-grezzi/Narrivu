@@ -464,6 +464,10 @@ function restoreSheet() {
 const personPicker = (name, value) => `<div class="seg">${PERSONE.map(p =>
   `<label class="p-${slug(p)}"><input type="radio" name="${name}" value="${p}" ${p === value ? 'checked' : ''}><span>${p}</span></label>`).join('')}</div>`;
 
+// Se il telefono non sa ancora chi sei (link senza «who»), il modulo lo chiede e se lo ricorda.
+const whoFieldset = () => state.cfg.autore ? '' : `<fieldset><legend>Chi sei</legend><div class="seg two">${AUTORI.map(a => `<label><input type="radio" name="who" value="${a}" required><span>${a}</span></label>`).join('')}</div></fieldset>`;
+function rememberWho(f) { if (f.who && AUTORI.includes(f.who) && !state.cfg.autore) { state.cfg.autore = f.who; save(LS_CFG, state.cfg); } }
+
 function addEvent(e) {
   const today = ymd(new Date());
   const ev = e || { titolo: '', data: today, ora: '', per: 'Famiglia', note: '' };
@@ -473,8 +477,8 @@ function addEvent(e) {
       <div class="two"><label>Giorno<input name="data" type="date" required value="${esc(ev.data)}"></label>
       <label>Ora <small>(facoltativa)</small><input name="ora" type="time" value="${esc(ev.ora)}"></label></div>
       <fieldset><legend>Per chi</legend>${personPicker('per', ev.per)}</fieldset>
-      <label>Note <small>(facoltative)</small><input name="note" type="text" maxlength="120" value="${esc(ev.note)}"></label>`,
-    onSubmit: f => upsert('Eventi', { id: e ? e.id : rid(), titolo: f.titolo, data: f.data, ora: f.ora || '', per: f.per, note: f.note || '', autore: e ? e.autore : state.cfg.autore }),
+      <label>Note <small>(facoltative)</small><input name="note" type="text" maxlength="120" value="${esc(ev.note)}"></label>${whoFieldset()}`,
+    onSubmit: f => { rememberWho(f); return upsert('Eventi', { id: e ? e.id : rid(), titolo: f.titolo, data: f.data, ora: f.ora || '', per: f.per, note: f.note || '', autore: e ? e.autore : state.cfg.autore }); },
     onDelete: e ? () => remove('Eventi', e.id) : null
   });
 }
@@ -488,8 +492,8 @@ function addReminder(r) {
     body: `<label>Ricordami di<input name="testo" type="text" required maxlength="100" value="${esc(rm.testo)}" placeholder="Portare il certificato, chiamare l'idraulico…"></label>
       <label>Quando<input name="quando" type="datetime-local" required value="${esc(rm.quando)}"></label>
       <fieldset><legend>Riguarda</legend>${personPicker('per', rm.per)}</fieldset>
-      <p class="hint">La notifica arriva per email.</p>`,
-    onSubmit: f => upsert('Promemoria', { id: r ? r.id : rid(), testo: f.testo, quando: f.quando, per: f.per, autore: r ? r.autore : state.cfg.autore }),
+      <p class="hint">La notifica arriva per email.</p>${whoFieldset()}`,
+    onSubmit: f => { rememberWho(f); return upsert('Promemoria', { id: r ? r.id : rid(), testo: f.testo, quando: f.quando, per: f.per, autore: r ? r.autore : state.cfg.autore }); },
     onDelete: r ? () => remove('Promemoria', r.id) : null
   });
 }
@@ -501,8 +505,8 @@ function addExpiry(s) {
     body: `<label>Prodotto<input name="prodotto" type="text" required maxlength="60" value="${esc(sc.prodotto)}" placeholder="Yogurt, prosciutto, latte…"></label>
       <label>Scade il<input name="scadenza" type="date" required value="${esc(sc.scadenza)}"></label>
       <label>Avvisami<select name="avviso_giorni">${[0, 1, 2, 3, 5, 7].map(n => `<option value="${n}" ${String(n) === String(sc.avviso_giorni || '2') ? 'selected' : ''}>${n === 0 ? 'il giorno stesso' : n === 1 ? '1 giorno prima' : n + ' giorni prima'}</option>`).join('')}</select></label>
-      <p class="hint">L'avviso arriva ogni mattina tra le 8 e le 9.</p>`,
-    onSubmit: f => upsert('Scadenze', { id: s ? s.id : rid(), prodotto: f.prodotto, scadenza: f.scadenza, avviso_giorni: f.avviso_giorni, autore: s ? s.autore : state.cfg.autore }),
+      <p class="hint">L'avviso arriva ogni mattina tra le 8 e le 9.</p>${whoFieldset()}`,
+    onSubmit: f => { rememberWho(f); return upsert('Scadenze', { id: s ? s.id : rid(), prodotto: f.prodotto, scadenza: f.scadenza, avviso_giorni: f.avviso_giorni, autore: s ? s.autore : state.cfg.autore }); },
     onDelete: s ? () => remove('Scadenze', s.id) : null
   });
 }
@@ -558,6 +562,7 @@ const findBy = (key, id) => state.data[key].find(r => r.id === id);
 function finito(prodotto) {
   const p = prodotto.trim();
   if (!p) return;
+  if (!state.cfg.autore) { toast('Scegli prima chi sei.'); openSettings(); return; }
   const same = state.data.spesa.find(s => s.prodotto.toLowerCase() === p.toLowerCase());
   if (same && same.stato === 'da_comprare') { toast(p + ' è già in lista.'); return; }
   if (same) upsert('Spesa', { id: same.id, stato: 'da_comprare' });
