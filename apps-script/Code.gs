@@ -77,6 +77,8 @@ function showSetup() {
   const p = PropertiesService.getScriptProperties();
   let url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* non ancora pubblicato */ }
+  // Dall'editor l'indirizzo termina con /dev (versione di prova, solo per il proprietario): per tutti gli altri serve /exec.
+  url = url.replace(/\/dev$/, '/exec');
   Logger.log('TOKEN: ' + p.getProperty('TOKEN'));
   Logger.log('CANALE NTFY: ' + p.getProperty('NTFY_TOPIC') + ' su ' + p.getProperty('NTFY_SERVER'));
   Logger.log('INDIRIZZO API: ' + (url || '(pubblica prima l\'app web: Distribuisci > Nuova distribuzione)'));
@@ -86,6 +88,12 @@ function showSetup() {
     Logger.log('LINK LUCIA: ' + base + '&mode=phone&who=Lucia');
     Logger.log('LINK TABLET: ' + base + '&mode=display');
   }
+}
+
+/** Genera un nuovo token (i vecchi link smettono di funzionare). Poi esegui showSetup per i nuovi link. */
+function rigeneraToken() {
+  PropertiesService.getScriptProperties().setProperty('TOKEN', randomString_(32));
+  Logger.log('Nuovo token generato. Esegui showSetup per ottenere i nuovi link.');
 }
 
 /** Prova rapida: manda una notifica di prova dal menu Esegui. */
