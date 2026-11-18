@@ -7,7 +7,7 @@ const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
-const VERSION = 'v14'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v15'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -188,7 +188,13 @@ function readHash() {
 function boot() {
   readHash();
   render();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    // Quando arriva una versione nuova, ricarica da sola (una volta) invece di restare su quella vecchia.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded && !state.sheet) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
   if (state.cfg) refresh();
   setInterval(() => { if (!document.hidden) refresh(); }, SYNC_MS);
   setInterval(() => { if (isDisplay()) render(); }, 30000);
