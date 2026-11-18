@@ -414,21 +414,26 @@ function notify_(title, message, opts) {
   const payload = { topic: topic, title: title, message: message, priority: opts.priority || 3, tags: opts.tags || [] };
   const click = p.getProperty('APP_URL');
   if (click) payload.click = click;
-  try {
-    const res = UrlFetchApp.fetch(server, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-    const ok = res.getResponseCode() >= 200 && res.getResponseCode() < 300;
-    if (!ok) NTFY_ERRORE_ = 'ntfy ha risposto ' + res.getResponseCode() + ' ' + String(res.getContentText()).slice(0, 120);
-    return ok;
-  } catch (err) {
-    NTFY_ERRORE_ = String(err && err.message || err).slice(0, 160);
-    Logger.log('ntfy: ' + NTFY_ERRORE_);
-    return false;
+  // "Indirizzo non disponibile" capita quando Google assegna un indirizzo IP che il server rifiuta: si ritenta (ogni tentativo usa un IP diverso).
+  for (let tentativo = 1; tentativo <= 4; tentativo++) {
+    try {
+      const res = UrlFetchApp.fetch(server, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      const code = res.getResponseCode();
+      if (code >= 200 && code < 300) return true;
+      NTFY_ERRORE_ = 'ntfy ha risposto ' + code + ' ' + String(res.getContentText()).slice(0, 120);
+      if (code < 429) break; // errore definitivo (es. 400, 403): inutile ritentare
+    } catch (err) {
+      NTFY_ERRORE_ = String(err && err.message || err).slice(0, 160);
+    }
+    Logger.log('ntfy tentativo ' + tentativo + ': ' + NTFY_ERRORE_);
+    if (tentativo < 4) Utilities.sleep(1500 * tentativo);
   }
+  return false;
 }
 
 /* ------------------------------------------------------------------ */

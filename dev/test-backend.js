@@ -46,7 +46,8 @@ const ctx = {
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: t => ({ t, setMimeType() { return this; }, getContent() { return t; } }) },
   Utilities: {
     getUuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => (Math.random() * 16 | 0).toString(16)),
-    formatDate: (d, tz, f) => fmt(d, f)
+    formatDate: (d, tz, f) => fmt(d, f),
+    sleep: () => {}
   },
   Session: { getScriptTimeZone: () => 'Europe/Rome' },
   ScriptApp: {
