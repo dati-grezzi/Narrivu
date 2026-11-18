@@ -298,3 +298,5 @@ html.mode-display .sheet { left: 50%; right: auto; bottom: auto; top: 50%; trans
 }
 
 .logo { width: 1.15em; height: 1.15em; vertical-align: -.22em; margin-right: .35em; }
+
+.ver { font-size: .7rem; font-weight: 600; letter-spacing: 0; opacity: .6; vertical-align: middle; margin-left: .15rem; }

@@ -7,6 +7,7 @@ const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
+const VERSION = 'v14'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -218,7 +219,7 @@ function render() {
 function setupView() {
   const c = state.cfg || {};
   return `<main class="setup">
-    <h1>${LOGO}Narrivu</h1>
+    <h1>${LOGO}Narrivu <small class="ver">${VERSION}</small></h1>
     <p>${state.authError ? 'Il token non è più valido. Inseriscilo di nuovo.' : 'Collega l\'app al foglio di casa. Se hai ricevuto un link già pronto, aprilo e basta.'}</p>
     <form data-form="setup">
       <label>Indirizzo API<input name="api" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="${esc(c.api || '')}"></label>
@@ -349,7 +350,7 @@ function renderPhone() {
   const who = (state.cfg.autore) || 'Chi sei?';
   const showFab = state.tab !== 'spesa';
   $('#root').innerHTML = `<div class="phone">
-    <header class="bar"><h1>${LOGO}Narrivu</h1><span id="sync" class="sync"></span>
+    <header class="bar"><h1>${LOGO}Narrivu <small class="ver">${VERSION}</small></h1><span id="sync" class="sync"></span>
       <button class="who" data-act="settings">${esc(who)} ${ico('gear')}</button></header>
     <main id="view" class="view">${phoneView()}</main>
     ${showFab ? `<button class="fab" data-act="add" aria-label="Aggiungi">${ico('plus')}</button>` : ''}
