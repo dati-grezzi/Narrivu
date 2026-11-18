@@ -589,7 +589,7 @@ document.addEventListener('click', ev => {
       if (inp && inp.value.trim()) { upsert('Abituali', { id: rid(), prodotto: inp.value.trim() }); inp.value = ''; refreshSettingsList(); }
       break;
     }
-    case 'test-notify': apiPost({ action: 'test' }).then(r => toast(r.ok ? 'Prova inviata.' : 'Non riesco a inviare: controlla il canale.')).catch(() => toast('Nessuna rete.')); break;
+    case 'test-notify': apiPost({ action: 'test' }).then(r => toast(r.ok ? 'Prova inviata.' : 'Non riesco a inviare: ' + (r.error || 'controlla il canale.'))).catch(() => toast('Nessuna rete.')); break;
     case 'reset':
       if (confirm('Scollegare questo dispositivo dal planner?')) {
         localStorage.removeItem(LS_CFG); localStorage.removeItem(LS_CACHE); localStorage.removeItem(LS_QUEUE);

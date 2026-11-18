@@ -81,7 +81,8 @@ const WEBAPP_URL = '';
 
 function showSetup() {
   const p = PropertiesService.getScriptProperties();
-  let url = WEBAPP_URL;
+  if (WEBAPP_URL) p.setProperty('WEBAPP_URL', WEBAPP_URL);
+  let url = WEBAPP_URL || p.getProperty('WEBAPP_URL') || '';
   if (!url) { try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* non ancora pubblicato */ } }
   Logger.log('TOKEN: ' + p.getProperty('TOKEN'));
   Logger.log('CANALE NTFY: ' + p.getProperty('NTFY_TOPIC') + ' su ' + p.getProperty('NTFY_SERVER'));
@@ -104,7 +105,8 @@ function rigeneraToken() {
 
 /** Prova rapida: manda una notifica di prova dal menu Esegui. */
 function testNotifica() {
-  Logger.log(notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] }));
+  const ok = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] });
+  Logger.log(ok ? 'Notifica inviata: controlla ntfy.' : 'NOTIFICA NON INVIATA: ' + NTFY_ERRORE_);
 }
 
 /* ------------------------------------------------------------------ */
@@ -133,7 +135,10 @@ function handle_(req) {
       case 'upsert': return json_(withLock_(function () { return upsert_(req.tab, req.row); }));
       case 'remove': return json_(withLock_(function () { return remove_(req.tab, req.id); }));
       case 'ops':    return json_(withLock_(function () { return runOps_(req.ops); }));
-      case 'test':   return json_({ ok: notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] }) });
+      case 'test': {
+        const sent = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] });
+        return json_(sent ? { ok: true } : { ok: false, error: NTFY_ERRORE_ || 'notifica non inviata' });
+      }
       default:       return json_({ ok: false, error: 'Azione sconosciuta' });
     }
   } catch (err) {
@@ -397,11 +402,14 @@ function deleteWhere_(tab, pred) {
 }
 
 /** Invia una notifica con l'API JSON di ntfy (supporta accenti e testo a capo). */
+let NTFY_ERRORE_ = '';
+
 function notify_(title, message, opts) {
   opts = opts || {};
+  NTFY_ERRORE_ = '';
   const p = PropertiesService.getScriptProperties();
   const topic = p.getProperty('NTFY_TOPIC');
-  if (!topic) return false;
+  if (!topic) { NTFY_ERRORE_ = 'canale ntfy non impostato (esegui setup)'; return false; }
   const server = (p.getProperty('NTFY_SERVER') || 'https://ntfy.sh').replace(/\/+$/, '');
   const payload = { topic: topic, title: title, message: message, priority: opts.priority || 3, tags: opts.tags || [] };
   const click = p.getProperty('APP_URL');
@@ -413,9 +421,12 @@ function notify_(title, message, opts) {
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     });
-    return res.getResponseCode() >= 200 && res.getResponseCode() < 300;
+    const ok = res.getResponseCode() >= 200 && res.getResponseCode() < 300;
+    if (!ok) NTFY_ERRORE_ = 'ntfy ha risposto ' + res.getResponseCode() + ' ' + String(res.getContentText()).slice(0, 120);
+    return ok;
   } catch (err) {
-    Logger.log('ntfy: ' + err);
+    NTFY_ERRORE_ = String(err && err.message || err).slice(0, 160);
+    Logger.log('ntfy: ' + NTFY_ERRORE_);
     return false;
   }
 }

@@ -40,7 +40,7 @@ Chiunque conosca il nome del canale può leggere le notifiche: il nome è casual
 - Pressione lunga sul titolo/pallino: impostazioni.
 
 ## Aggiornare
-Modifica i file, ricarica su GitHub e aumenta `CACHE` in `sw.js` (es. `narrivu-v8`), altrimenti i dispositivi restano sulla versione vecchia. Dopo modifiche a `Code.gs`: **Distribuisci > Gestisci distribuzioni > Modifica > Nuova versione**.
+Modifica i file, ricarica su GitHub e aumenta `CACHE` in `sw.js` (es. `narrivu-v9`), altrimenti i dispositivi restano sulla versione vecchia. Dopo modifiche a `Code.gs`: **Distribuisci > Gestisci distribuzioni > Modifica > Nuova versione**.
 
 ## Prove in locale
 ```

@@ -1,7 +1,7 @@
 'use strict';
 /* Service worker: tiene l'app disponibile anche senza rete.
    Cambia il numero di versione qui sotto quando pubblichi una nuova versione. */
-const CACHE = 'narrivu-v8';
+const CACHE = 'narrivu-v9';
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './fonts/bricolage.woff2', './icon-192.png', './icon-512.png'];
 
