@@ -10,7 +10,7 @@
  * (vedi README). Licenza: GPL-3.0.
  */
 
-const PERSONE = ['Famiglia', 'Lucia', 'Eddie', 'Zaja']; // a chi si riferisce un evento
+const PERSONE = ['Famiglia', 'Alfio', 'Lucia', 'Eddie', 'Zaja']; // a chi si riferisce un evento
 const AUTORI = ['Alfio', 'Lucia'];                      // chi inserisce
 const STATI_SPESA = ['da_comprare', 'comprato'];
 

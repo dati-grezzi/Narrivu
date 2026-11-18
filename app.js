@@ -2,12 +2,12 @@
 const LOGO = '<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#D8E8D2"/><defs><clipPath id="nvh"><path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.689-8.69a2.25 2.25 0 0 0-3.182 0l-8.69 8.69a.75.75 0 1 0 1.061 1.06l8.69-8.689Z"/><path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z"/><path d="M4 6h2v3L4 11z"/><path d="M10 1c0 1.66-1.34 3-3 3-.55 0-1 .45-1 1H4c0-1.66 1.34-3 3-3 .55 0 1-.45 1-1h2z"/></clipPath></defs><g transform="rotate(-13 44 52) translate(10.4 21.5) scale(2.8)"><g clip-path="url(#nvh)"><rect x="0" y="0" width="12" height="12.5" fill="#D9412F"/><rect x="12" y="0" width="12" height="12.5" fill="#F08A1D"/><rect x="0" y="12.5" width="12" height="12" fill="#F5C92E"/><rect x="12" y="12.5" width="12" height="12" fill="#2E9E62"/></g></g><g fill="none" stroke="#16424A" stroke-width="3.6" stroke-linecap="round"><path d="M77.5 36.4A37 37 0 0 1 81.0 52.6"/><path d="M80.4 25.5A45 45 0 0 1 88.0 61.4"/></g></svg>';
 /* Narrivu — app web per tablet e telefoni. Licenza: GPL-3.0 */
 
-const PERSONE = ['Famiglia', 'Lucia', 'Eddie', 'Zaja'];
+const PERSONE = ['Famiglia', 'Alfio', 'Lucia', 'Eddie', 'Zaja'];
 const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
-const VERSION = 'v15'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v16'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);

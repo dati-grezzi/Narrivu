@@ -22,11 +22,13 @@
   --good: #2E9E62;
   /* Un magnete per persona: colore e colore del testo sopra di esso */
   --famiglia: #1E6670;
+  --alfio: #3A5BA8;
   --lucia: #C23B72;
   --eddie: #E8A020;
   --zaja: #2C8A55;
 }
 .p-famiglia { --pc: var(--famiglia); --pt: #fff; }
+.p-alfio { --pc: var(--alfio); --pt: #fff; }
 .p-lucia { --pc: var(--lucia); --pt: #fff; }
 .p-eddie { --pc: var(--eddie); --pt: var(--ink); }
 .p-zaja { --pc: var(--zaja); --pt: #fff; }

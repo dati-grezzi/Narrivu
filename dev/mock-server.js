@@ -10,7 +10,7 @@ const path = require('path');
 const PORT = process.env.PORT || 8080;
 const TOKEN = 'dev';
 const WEB = path.join(__dirname, '..');
-const PERSONE = ['Famiglia', 'Lucia', 'Eddie', 'Zaja'];
+const PERSONE = ['Famiglia', 'Alfio', 'Lucia', 'Eddie', 'Zaja'];
 const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 
