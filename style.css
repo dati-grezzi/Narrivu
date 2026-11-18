@@ -25,12 +25,12 @@
   --alfio: #BF4A0A;
   --lucia: #C23B72;
   --eddie: #E8A020;
-  --zaja: #2C8A55;
+  --zaja: #267A4A;
 }
 .p-famiglia { --pc: var(--famiglia); --pt: #fff; }
 .p-alfio { --pc: var(--alfio); --pt: #fff; }
 .p-lucia { --pc: var(--lucia); --pt: #fff; }
-.p-eddie { --pc: var(--eddie); --pt: var(--ink); }
+.p-eddie { --pc: var(--eddie); --pt: var(--ink); --au: rgba(22, 66, 74, .16); }
 .p-zaja { --pc: var(--zaja); --pt: #fff; }
 
 body.night {
@@ -122,8 +122,8 @@ html.mode-display body { overflow: hidden; user-select: none; -webkit-user-selec
 }
 .mag .tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mag .t { font-weight: 800; }
-.mag .au { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; font-weight: 800; background: rgba(255, 255, 255, .26); }
-.p-eddie .au { background: rgba(22, 66, 74, .16); }
+.mag .au { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; font-weight: 800; background: var(--au, rgba(255, 255, 255, .26)); }
+
 .mag .ico svg { width: 1.15em; height: 1.15em; }
 .mag.rem { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 .18rem var(--pc, var(--petrol)); }
 .mag.rem .au { background: var(--pc); color: var(--pt); }
@@ -302,3 +302,8 @@ html.mode-display .sheet { left: 50%; right: auto; bottom: auto; top: 50%; trans
 .logo { width: 1.15em; height: 1.15em; vertical-align: -.22em; margin-right: .35em; }
 
 .ver { font-size: .7rem; font-weight: 600; letter-spacing: 0; opacity: .6; vertical-align: middle; margin-left: .15rem; }
+
+.colrow { display: flex; flex-direction: column; gap: .45rem; margin: .7rem 0 0; align-items: flex-start; }
+.swatches { display: flex; flex-wrap: wrap; gap: .3rem; }
+.sw { width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55); }
+.sw.on { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--board); }

@@ -7,7 +7,7 @@ const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
-const VERSION = 'v17'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v18'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -149,7 +149,9 @@ async function refresh() {
     const data = { ...emptyData(), ...r.data };
     queue.forEach(op => applyOp(data, op));
     state.data = data;
+    const oldColori = state.config && state.config.colori;
     state.config = r.config || {};
+    if (!state.config.colori || !Object.keys(state.config.colori).length) { if (oldColori) state.config.colori = oldColori; }
     state.lastSync = Date.now();
     state.err = '';
     setOnline(true);
@@ -212,9 +214,38 @@ async function wake() {
 const isDisplay = () => !!(state.cfg && state.cfg.mode === 'display' && !state.authError);
 
 /* ---------- rendering ---------- */
+/* ---------- colori delle etichette ---------- */
+const PALETTE = ['#1E6670', '#3A5BA8', '#BF4A0A', '#C23B72', '#E8A020', '#267A4A', '#7B4EA3', '#B3261E', '#5B6770'];
+const COLORI_DEFAULT = { Famiglia: '#1E6670', Alfio: '#BF4A0A', Lucia: '#C23B72', Eddie: '#E8A020', Zaja: '#267A4A' };
+const luminance = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const colorOf = p => ((state.config && state.config.colori) || {})[p] || COLORI_DEFAULT[p];
+function applyColors() {
+  const css = PERSONE.map(p => {
+    const bg = colorOf(p), white = 1.05 / (luminance(bg) + 0.05) >= 4.5;
+    return `.p-${slug(p)} { --pc: ${bg}; --pt: ${white ? '#fff' : '#16424A'}; --au: ${white ? 'rgba(255,255,255,.26)' : 'rgba(22,66,74,.16)'}; }`;
+  }).join('\n');
+  let el = document.getElementById('pcolors');
+  if (!el) { el = document.createElement('style'); el.id = 'pcolors'; document.head.appendChild(el); }
+  if (el.textContent !== css) el.textContent = css;
+}
+let colorTimer = null;
+function saveColors() {
+  clearTimeout(colorTimer);
+  colorTimer = setTimeout(() => {
+    apiPost({ action: 'setColori', colori: state.config.colori || {} })
+      .then(r => { if (!r.ok) toast(r.error === 'Azione sconosciuta' ? 'Colori salvati solo su questo telefono: aggiorna lo script.' : 'Colori non salvati: ' + r.error); })
+      .catch(() => toast('Nessuna rete: colori salvati solo su questo telefono.'));
+  }, 600);
+}
+function colorsFieldset() {
+  return `<fieldset><legend>Colori delle etichette</legend>${PERSONE.map(p => `<div class="colrow"><span class="mag mini p-${slug(p)}">${esc(p)}</span>
+    <div class="swatches">${PALETTE.map(c => `<button type="button" class="sw ${colorOf(p).toUpperCase() === c ? 'on' : ''}" style="background:${c}" data-act="set-color" data-person="${esc(p)}" data-color="${c}" aria-label="${esc(p)}: colore ${c}"></button>`).join('')}</div></div>`).join('')}</fieldset>`;
+}
+
 function render() {
   const root = $('#root');
   if (state.sheet) { state.dirty = true; const sy = $('#sync'); if (sy) paintSync(sy); return; } // si ridisegna alla chiusura
+  applyColors();
   document.documentElement.classList.toggle('mode-display', isDisplay());
   if (!state.cfg || state.authError) { root.innerHTML = setupView(); return; }
   if (isDisplay()) { renderDisplay(); return; }
@@ -536,6 +567,7 @@ function openSettings() {
         <p class="hint">Più indirizzi separati da virgola.</p>
         ${c.mode === 'display' ? '' : '<div class="row-btns"><button type="button" class="btn" data-act="save-email">Salva email</button><button type="button" class="btn" data-act="test-notify">Invia una prova</button></div>'}
       </fieldset>
+      ${c.mode === 'display' ? '' : colorsFieldset()}
       ${c.mode === 'display' ? '' : `<fieldset><legend>Prodotti che finiscono spesso</legend>
         <div class="chips" id="usuals">${usualsHtml()}</div>
         <div class="inline"><input name="nuovo_abituale" placeholder="Aggiungi un prodotto" autocomplete="off"><button type="button" class="btn" data-act="add-usual">Aggiungi</button></div></fieldset>`}
@@ -600,6 +632,13 @@ document.addEventListener('click', ev => {
     case 'add-usual': {
       const inp = $('input[name=nuovo_abituale]');
       if (inp && inp.value.trim()) { upsert('Abituali', { id: rid(), prodotto: inp.value.trim() }); inp.value = ''; refreshSettingsList(); }
+      break;
+    }
+    case 'set-color': {
+      const person = t.dataset.person, color = t.dataset.color;
+      state.config.colori = { ...(state.config.colori || {}), [person]: color };
+      t.parentElement.querySelectorAll('.sw').forEach(b => b.classList.toggle('on', b === t));
+      applyColors(); persist(); saveColors();
       break;
     }
     case 'save-email': {

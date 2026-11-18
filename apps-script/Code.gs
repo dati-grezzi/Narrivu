@@ -137,6 +137,18 @@ function handle_(req) {
       case 'upsert': return json_(withLock_(function () { return upsert_(req.tab, req.row); }));
       case 'remove': return json_(withLock_(function () { return remove_(req.tab, req.id); }));
       case 'ops':    return json_(withLock_(function () { return runOps_(req.ops); }));
+      case 'setColori': {
+        const c = req.colori || {};
+        const out = {};
+        for (let i = 0; i < PERSONE.length; i++) {
+          const v = c[PERSONE[i]];
+          if (v === undefined || v === null || v === '') continue;
+          if (!/^#[0-9A-Fa-f]{6}$/.test(String(v))) return json_({ ok: false, error: 'Colore non valido per ' + PERSONE[i] });
+          out[PERSONE[i]] = String(v).toUpperCase();
+        }
+        PropertiesService.getScriptProperties().setProperty('COLORI', JSON.stringify(out));
+        return json_({ ok: true, colori: out });
+      }
       case 'setEmail': {
         const list = String(req.emails || '').split(/[,;\s]+/).filter(Boolean);
         if (!list.length || list.length > 6) return json_({ ok: false, error: 'Inserisci da 1 a 6 indirizzi email' });
@@ -164,7 +176,7 @@ function listAll_() {
   return {
     ok: true,
     now: nowLocal_(),
-    config: { emailDestinatari: p.getProperty('EMAIL_DESTINATARI') || '' },
+    config: { emailDestinatari: p.getProperty('EMAIL_DESTINATARI') || '', colori: parseJson_(p.getProperty('COLORI')) },
     data: {
       eventi: readTab_('Eventi').filter(function (r) { return r.data >= from; }),
       scadenze: readTab_('Scadenze').filter(function (r) { return r.consumato !== 'si'; }),
@@ -439,6 +451,10 @@ function notify_(title, message, opts) {
 /* ------------------------------------------------------------------ */
 /* Utilità                                                             */
 /* ------------------------------------------------------------------ */
+
+function parseJson_(t) {
+  try { return t ? JSON.parse(t) : {}; } catch (e) { return {}; }
+}
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);

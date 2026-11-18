@@ -103,7 +103,8 @@ function upsert(tab, row) {
 function handle(req) {
   if (req.token !== TOKEN) return { ok: false, error: 'Token non valido' };
   try {
-    if (req.action === 'list') return { ok: true, now: now(), config: { ntfyTopic: 'casa-prova', ntfyServer: 'https://ntfy.sh' }, data: db };
+    if (req.action === 'setColori') { db.__colori = req.colori || {}; return { ok: true, colori: db.__colori }; }
+    if (req.action === 'list') return { ok: true, now: now(), config: { emailDestinatari: 'casa@example.com', colori: db.__colori || {} }, data: db };
     if (req.action === 'ops') return { ok: true, results: req.ops.map(op => op.action === 'remove' ? (db[KEY[op.tab]] = db[KEY[op.tab]].filter(r => r.id !== op.id), { ok: true }) : upsert(op.tab, op.row)) };
     if (req.action === 'test') return { ok: true };
     return { ok: false, error: 'Azione sconosciuta' };

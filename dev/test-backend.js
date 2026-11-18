@@ -77,6 +77,13 @@ t('setEmail: salva e valida', () => {
   assert.strictEqual(props.EMAIL_DESTINATARI, 'a@b.it, c@d.it');
   call({ token: TOKEN, action: 'setEmail', emails: 'casa@example.com' }, false);
 });
+t('setColori: salva, valida, torna in list', () => {
+  const r = call({ token: TOKEN, action: 'setColori', colori: { Alfio: '#bf4a0a', Lucia: '#C23B72', Altro: '#000000' } }, false);
+  assert(r.ok && r.colori.Alfio === '#BF4A0A' && !r.colori.Altro);
+  assert(!call({ token: TOKEN, action: 'setColori', colori: { Alfio: 'rosso' } }, false).ok);
+  call({ token: TOKEN, action: 'setColori', colori: { Alfio: '#BF4A0A' } }, false);
+  assert.strictEqual(call({ token: TOKEN, action: 'list' }, false).config.colori.Alfio, '#BF4A0A');
+});
 t('evento: crea e modifica', () => {
   const r = call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', titolo: 'Dentista', data: '2026-11-16', ora: '17:30', per: 'Eddie', autore: 'Lucia' } });
   assert(r.ok && r.created);
