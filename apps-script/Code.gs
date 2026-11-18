@@ -73,21 +73,27 @@ function setup() {
 /** Indirizzo della pagina su GitHub Pages (cambialo dopo la pubblicazione). */
 const PAGES_URL = 'https://datigrezzi.it/Narrivu/';
 
+/**
+ * Indirizzo dell'app web: incollalo da Distribuisci > Gestisci distribuzioni > "Copia" (URL che finisce con /exec).
+ * Serve perché dall'editor lo script conosce solo l'indirizzo di prova (/dev), che non funziona per gli altri dispositivi.
+ */
+const WEBAPP_URL = '';
+
 function showSetup() {
   const p = PropertiesService.getScriptProperties();
-  let url = '';
-  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* non ancora pubblicato */ }
-  // Dall'editor l'indirizzo termina con /dev (versione di prova, solo per il proprietario): per tutti gli altri serve /exec.
-  url = url.replace(/\/dev$/, '/exec');
+  let url = WEBAPP_URL;
+  if (!url) { try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* non ancora pubblicato */ } }
   Logger.log('TOKEN: ' + p.getProperty('TOKEN'));
   Logger.log('CANALE NTFY: ' + p.getProperty('NTFY_TOPIC') + ' su ' + p.getProperty('NTFY_SERVER'));
-  Logger.log('INDIRIZZO API: ' + (url || '(pubblica prima l\'app web: Distribuisci > Nuova distribuzione)'));
-  if (url) {
-    const base = PAGES_URL + '#api=' + encodeURIComponent(url) + '&t=' + encodeURIComponent(p.getProperty('TOKEN'));
-    Logger.log('LINK ALFIO: ' + base + '&mode=phone&who=Alfio');
-    Logger.log('LINK LUCIA: ' + base + '&mode=phone&who=Lucia');
-    Logger.log('LINK TABLET: ' + base + '&mode=display');
+  if (!url || /\/dev$/.test(url)) {
+    Logger.log('ATTENZIONE: manca l\'indirizzo /exec. Vai su Distribuisci > Gestisci distribuzioni, premi "Copia" sull\'URL dell\'app web, incollalo in WEBAPP_URL in cima a showSetup, salva e riesegui showSetup.');
+    return;
   }
+  Logger.log('INDIRIZZO API: ' + url);
+  const base = PAGES_URL + '#api=' + encodeURIComponent(url) + '&t=' + encodeURIComponent(p.getProperty('TOKEN'));
+  Logger.log('LINK ALFIO: ' + base + '&mode=phone&who=Alfio');
+  Logger.log('LINK LUCIA: ' + base + '&mode=phone&who=Lucia');
+  Logger.log('LINK TABLET: ' + base + '&mode=display');
 }
 
 /** Genera un nuovo token (i vecchi link smettono di funzionare). Poi esegui showSetup per i nuovi link. */
