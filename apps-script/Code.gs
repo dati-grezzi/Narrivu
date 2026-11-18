@@ -106,7 +106,7 @@ function rigeneraToken() {
 /** Prova rapida: manda una notifica di prova dal menu Esegui. */
 function testNotifica() {
   const ok = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] });
-  Logger.log(ok ? 'Notifica inviata: controlla ntfy.' : 'NOTIFICA NON INVIATA: ' + NTFY_ERRORE_);
+  Logger.log(ok ? 'Notifica inviata: controlla la posta (e ntfy).' : 'NOTIFICA NON INVIATA: ' + NTFY_ERRORE_);
 }
 
 /* ------------------------------------------------------------------ */
@@ -404,34 +404,61 @@ function deleteWhere_(tab, pred) {
 /** Invia una notifica con l'API JSON di ntfy (supporta accenti e testo a capo). */
 let NTFY_ERRORE_ = '';
 
+// Invia la notifica su due canali: email (affidabile) e ntfy (push immediata, se raggiungibile).
+// Restituisce true se almeno un canale ha funzionato; NTFY_ERRORE_ riassume gli errori.
 function notify_(title, message, opts) {
   opts = opts || {};
-  NTFY_ERRORE_ = '';
+  const errori = [];
+  const emailOk = emailNotify_(title, message, errori);
+  const ntfyOk = ntfyNotify_(title, message, opts, errori);
+  NTFY_ERRORE_ = (emailOk || ntfyOk) ? '' : errori.join(' | ');
+  if (errori.length) Logger.log('Notifica: ' + errori.join(' | '));
+  return emailOk || ntfyOk;
+}
+
+function emailNotify_(title, message, errori) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    const dest = p.getProperty('EMAIL_DESTINATARI') || Session.getEffectiveUser().getEmail();
+    if (!dest) { errori.push('email: nessun destinatario'); return false; }
+    const link = p.getProperty('APP_URL');
+    MailApp.sendEmail({
+      to: dest,
+      subject: 'Narrivu: ' + title,
+      body: message + (link ? '\n\nApri Narrivu: ' + link : ''),
+      name: 'Narrivu'
+    });
+    return true;
+  } catch (err) {
+    errori.push('email: ' + String(err && err.message || err).slice(0, 160));
+    return false;
+  }
+}
+
+function ntfyNotify_(title, message, opts, errori) {
   const p = PropertiesService.getScriptProperties();
   const topic = p.getProperty('NTFY_TOPIC');
-  if (!topic) { NTFY_ERRORE_ = 'canale ntfy non impostato (esegui setup)'; return false; }
+  if (!topic) { errori.push('ntfy: canale non impostato'); return false; }
   const server = (p.getProperty('NTFY_SERVER') || 'https://ntfy.sh').replace(/\/+$/, '');
   const payload = { topic: topic, title: title, message: message, priority: opts.priority || 3, tags: opts.tags || [] };
   const click = p.getProperty('APP_URL');
   if (click) payload.click = click;
-  // "Indirizzo non disponibile" capita quando Google assegna un indirizzo IP che il server rifiuta: si ritenta (ogni tentativo usa un IP diverso).
-  for (let tentativo = 1; tentativo <= 4; tentativo++) {
+  // Gli IP di Google sono condivisi: ntfy.sh può rifiutarli ("Indirizzo non disponibile") o aver esaurito la quota (429).
+  // Si ritenta solo per errori di rete; con 429 è inutile.
+  for (let tentativo = 1; tentativo <= 3; tentativo++) {
     try {
       const res = UrlFetchApp.fetch(server, {
-        method: 'post',
-        contentType: 'application/json',
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true
+        method: 'post', contentType: 'application/json',
+        payload: JSON.stringify(payload), muteHttpExceptions: true
       });
       const code = res.getResponseCode();
       if (code >= 200 && code < 300) return true;
-      NTFY_ERRORE_ = 'ntfy ha risposto ' + code + ' ' + String(res.getContentText()).slice(0, 120);
-      if (code < 429) break; // errore definitivo (es. 400, 403): inutile ritentare
+      errori.push('ntfy ' + code + ' ' + String(res.getContentText()).slice(0, 80));
+      return false;
     } catch (err) {
-      NTFY_ERRORE_ = String(err && err.message || err).slice(0, 160);
+      if (tentativo === 3) errori.push('ntfy: ' + String(err && err.message || err).slice(0, 100));
     }
-    Logger.log('ntfy tentativo ' + tentativo + ': ' + NTFY_ERRORE_);
-    if (tentativo < 4) Utilities.sleep(1500 * tentativo);
+    if (tentativo < 3) Utilities.sleep(1500 * tentativo);
   }
   return false;
 }
