@@ -58,6 +58,7 @@ const state = {
   config: {},
   lastSync: null,
   online: true,
+  err: '',
   authError: false,
   tab: 'agenda'
 };
@@ -70,7 +71,8 @@ async function apiGet(action) {
   const u = new URL(state.cfg.api);
   u.searchParams.set('token', state.cfg.token);
   u.searchParams.set('action', action);
-  const res = await fetch(u, { cache: 'no-store' });
+  u.searchParams.set('_', Date.now()); // evita la cache senza aggiungere intestazioni (niente richiesta preliminare CORS)
+  const res = await fetch(u);
   return res.json();
 }
 async function apiPost(body) {
@@ -134,28 +136,32 @@ async function flush() {
 async function refresh() {
   if (!state.cfg) return;
   if (queue.length && !flushing) { await flush(); return; }
+  let r;
+  try { r = await apiGet('list'); }
+  catch (e) { state.err = 'rete'; setOnline(false); return; }
+  if (!r.ok) {
+    if (r.error === 'Token non valido') { state.authError = true; render(); return; }
+    state.err = 'foglio: ' + r.error; setOnline(false); return;
+  }
   try {
-    const r = await apiGet('list');
-    if (!r.ok) {
-      if (r.error === 'Token non valido') { state.authError = true; render(); return; }
-      throw new Error(r.error);
-    }
     state.authError = false;
     const data = { ...emptyData(), ...r.data };
     queue.forEach(op => applyOp(data, op));
     state.data = data;
     state.config = r.config || {};
     state.lastSync = Date.now();
+    state.err = '';
     setOnline(true);
     persist();
     render();
   } catch (e) {
+    console.error(e);
+    state.err = 'app: ' + (e && e.message || e);
     setOnline(false);
   }
 }
 
 function setOnline(v) {
-  if (state.online === v) return;
   state.online = v;
   const el = $('#sync');
   if (el) paintSync(el);
@@ -270,7 +276,10 @@ function paintSync(el) {
   else {
     el.className = 'sync off';
     const t = state.lastSync ? new Date(state.lastSync) : null;
-    el.textContent = t ? 'senza rete, dati delle ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) : 'senza rete';
+    const er = state.err && state.err !== 'rete' ? state.err : '';
+    el.title = er || 'Nessuna risposta dal server';
+    el.textContent = er ? 'errore ' + er.slice(0, 70)
+      : (t ? 'senza rete, dati delle ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) : 'senza rete');
   }
 }
 
