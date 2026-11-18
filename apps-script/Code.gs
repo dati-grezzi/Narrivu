@@ -4,7 +4,7 @@
  * Cosa fa:
  *  - tiene i dati in un foglio (Eventi, Scadenze, Promemoria, Spesa, Abituali)
  *  - espone una piccola API JSON usata dall'app web (tablet e telefoni)
- *  - invia le notifiche dei promemoria e delle scadenze tramite ntfy
+ *  - invia le notifiche dei promemoria e delle scadenze via email
  *
  * Primo avvio: esegui setup() una volta dall'editor, poi pubblica come app web
  * (vedi README). Licenza: GPL-3.0.
@@ -53,8 +53,10 @@ function setup() {
 
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty('TOKEN')) props.setProperty('TOKEN', randomString_(32));
-  if (!props.getProperty('NTFY_TOPIC')) props.setProperty('NTFY_TOPIC', 'casa-' + randomString_(16));
-  if (!props.getProperty('NTFY_SERVER')) props.setProperty('NTFY_SERVER', 'https://ntfy.sh');
+  if (!props.getProperty('EMAIL_DESTINATARI')) {
+    const me = Session.getEffectiveUser().getEmail();
+    if (me) props.setProperty('EMAIL_DESTINATARI', me);
+  }
 
   const ab = ss.getSheetByName('Abituali');
   if (ab.getLastRow() < 2) {
@@ -69,7 +71,7 @@ function setup() {
   showSetup();
 }
 
-/** Stampa nel log i dati da copiare nell'app (token, canale ntfy, indirizzo). */
+/** Stampa nel log i dati da copiare nell'app (token, destinatari email, indirizzo). */
 /** Indirizzo della pagina su GitHub Pages (cambialo dopo la pubblicazione). */
 const PAGES_URL = 'https://datigrezzi.it/Narrivu/';
 
@@ -85,7 +87,7 @@ function showSetup() {
   let url = WEBAPP_URL || p.getProperty('WEBAPP_URL') || '';
   if (!url) { try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { /* non ancora pubblicato */ } }
   Logger.log('TOKEN: ' + p.getProperty('TOKEN'));
-  Logger.log('CANALE NTFY: ' + p.getProperty('NTFY_TOPIC') + ' su ' + p.getProperty('NTFY_SERVER'));
+  Logger.log('EMAIL NOTIFICHE: ' + (p.getProperty('EMAIL_DESTINATARI') || '(nessuna)'));
   if (!url || /\/dev$/.test(url)) {
     Logger.log('ATTENZIONE: manca l\'indirizzo /exec. Vai su Distribuisci > Gestisci distribuzioni, premi "Copia" sull\'URL dell\'app web, incollalo in WEBAPP_URL in cima a showSetup, salva e riesegui showSetup.');
     return;
@@ -105,8 +107,8 @@ function rigeneraToken() {
 
 /** Prova rapida: manda una notifica di prova dal menu Esegui. */
 function testNotifica() {
-  const ok = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] });
-  Logger.log(ok ? 'Notifica inviata: controlla la posta (e ntfy).' : 'NOTIFICA NON INVIATA: ' + NTFY_ERRORE_);
+  const ok = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', {});
+  Logger.log(ok ? 'Email di prova inviata: controlla la posta.' : 'NOTIFICA NON INVIATA: ' + NOTIFICA_ERRORE_);
 }
 
 /* ------------------------------------------------------------------ */
@@ -136,8 +138,8 @@ function handle_(req) {
       case 'remove': return json_(withLock_(function () { return remove_(req.tab, req.id); }));
       case 'ops':    return json_(withLock_(function () { return runOps_(req.ops); }));
       case 'test': {
-        const sent = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', { tags: ['white_check_mark'] });
-        return json_(sent ? { ok: true } : { ok: false, error: NTFY_ERRORE_ || 'notifica non inviata' });
+        const sent = notify_('Narrivu', 'Notifica di prova: se la leggi, funziona.', {});
+        return json_(sent ? { ok: true } : { ok: false, error: NOTIFICA_ERRORE_ || 'notifica non inviata' });
       }
       default:       return json_({ ok: false, error: 'Azione sconosciuta' });
     }
@@ -153,7 +155,7 @@ function listAll_() {
   return {
     ok: true,
     now: nowLocal_(),
-    config: { ntfyTopic: p.getProperty('NTFY_TOPIC'), ntfyServer: p.getProperty('NTFY_SERVER') },
+    config: { emailDestinatari: p.getProperty('EMAIL_DESTINATARI') || '' },
     data: {
       eventi: readTab_('Eventi').filter(function (r) { return r.data >= from; }),
       scadenze: readTab_('Scadenze').filter(function (r) { return r.consumato !== 'si'; }),
@@ -401,26 +403,15 @@ function deleteWhere_(tab, pred) {
   });
 }
 
-/** Invia una notifica con l'API JSON di ntfy (supporta accenti e testo a capo). */
-let NTFY_ERRORE_ = '';
+/** Invia una notifica via email ai destinatari (Script Property EMAIL_DESTINATARI, separati da virgola). */
+let NOTIFICA_ERRORE_ = '';
 
-// Invia la notifica su due canali: email (affidabile) e ntfy (push immediata, se raggiungibile).
-// Restituisce true se almeno un canale ha funzionato; NTFY_ERRORE_ riassume gli errori.
 function notify_(title, message, opts) {
-  opts = opts || {};
-  const errori = [];
-  const emailOk = emailNotify_(title, message, errori);
-  const ntfyOk = ntfyNotify_(title, message, opts, errori);
-  NTFY_ERRORE_ = (emailOk || ntfyOk) ? '' : errori.join(' | ');
-  if (errori.length) Logger.log('Notifica: ' + errori.join(' | '));
-  return emailOk || ntfyOk;
-}
-
-function emailNotify_(title, message, errori) {
+  NOTIFICA_ERRORE_ = '';
   try {
     const p = PropertiesService.getScriptProperties();
     const dest = p.getProperty('EMAIL_DESTINATARI') || Session.getEffectiveUser().getEmail();
-    if (!dest) { errori.push('email: nessun destinatario'); return false; }
+    if (!dest) { NOTIFICA_ERRORE_ = 'nessun destinatario email (esegui setup)'; return false; }
     const link = p.getProperty('APP_URL');
     MailApp.sendEmail({
       to: dest,
@@ -430,37 +421,10 @@ function emailNotify_(title, message, errori) {
     });
     return true;
   } catch (err) {
-    errori.push('email: ' + String(err && err.message || err).slice(0, 160));
+    NOTIFICA_ERRORE_ = String(err && err.message || err).slice(0, 160);
+    Logger.log('Email non inviata: ' + NOTIFICA_ERRORE_);
     return false;
   }
-}
-
-function ntfyNotify_(title, message, opts, errori) {
-  const p = PropertiesService.getScriptProperties();
-  const topic = p.getProperty('NTFY_TOPIC');
-  if (!topic) { errori.push('ntfy: canale non impostato'); return false; }
-  const server = (p.getProperty('NTFY_SERVER') || 'https://ntfy.sh').replace(/\/+$/, '');
-  const payload = { topic: topic, title: title, message: message, priority: opts.priority || 3, tags: opts.tags || [] };
-  const click = p.getProperty('APP_URL');
-  if (click) payload.click = click;
-  // Gli IP di Google sono condivisi: ntfy.sh può rifiutarli ("Indirizzo non disponibile") o aver esaurito la quota (429).
-  // Si ritenta solo per errori di rete; con 429 è inutile.
-  for (let tentativo = 1; tentativo <= 3; tentativo++) {
-    try {
-      const res = UrlFetchApp.fetch(server, {
-        method: 'post', contentType: 'application/json',
-        payload: JSON.stringify(payload), muteHttpExceptions: true
-      });
-      const code = res.getResponseCode();
-      if (code >= 200 && code < 300) return true;
-      errori.push('ntfy ' + code + ' ' + String(res.getContentText()).slice(0, 80));
-      return false;
-    } catch (err) {
-      if (tentativo === 3) errori.push('ntfy: ' + String(err && err.message || err).slice(0, 100));
-    }
-    if (tentativo < 3) Utilities.sleep(1500 * tentativo);
-  }
-  return false;
 }
 
 /* ------------------------------------------------------------------ */

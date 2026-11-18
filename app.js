@@ -488,7 +488,7 @@ function addReminder(r) {
     body: `<label>Ricordami di<input name="testo" type="text" required maxlength="100" value="${esc(rm.testo)}" placeholder="Portare il certificato, chiamare l'idraulico…"></label>
       <label>Quando<input name="quando" type="datetime-local" required value="${esc(rm.quando)}"></label>
       <fieldset><legend>Riguarda</legend>${personPicker('per', rm.per)}</fieldset>
-      <p class="hint">La notifica arriva a entrambi i telefoni con l'app ntfy.</p>`,
+      <p class="hint">La notifica arriva per email.</p>`,
     onSubmit: f => upsert('Promemoria', { id: r ? r.id : rid(), testo: f.testo, quando: f.quando, per: f.per, autore: r ? r.autore : state.cfg.autore }),
     onDelete: r ? () => remove('Promemoria', r.id) : null
   });
@@ -514,15 +514,15 @@ function usualsHtml() {
 
 function openSettings() {
   const c = state.cfg;
-  const topic = state.config.ntfyTopic, server = (state.config.ntfyServer || 'https://ntfy.sh').replace(/^https?:\/\//, '');
+  const mail = state.config.emailDestinatari || '';
   openSheet({
     title: 'Impostazioni',
     submit: 'Fatto',
     noFocus: true,
     body: () => `${c.mode === 'display' ? '' : `<fieldset><legend>Chi sei</legend><div class="seg two">${AUTORI.map(a => `<label><input type="radio" name="who" value="${a}" ${c.autore === a ? 'checked' : ''}><span>${a}</span></label>`).join('')}</div></fieldset>`}
       <fieldset><legend>Notifiche</legend>
-        ${topic ? `<p class="hint">Nell'app ntfy iscriviti al canale <strong class="mono">${esc(topic)}</strong> sul server <span class="mono">${esc(server)}</span>.</p>
-        <div class="row-btns"><a class="btn" href="ntfy://${esc(server)}/${esc(topic)}">Apri in ntfy</a><button type="button" class="btn" data-act="test-notify">Invia una prova</button></div>` : '<p class="hint">Il canale ntfy non è ancora configurato: esegui setup() nello script.</p>'}
+        ${mail ? `<p class="hint">Le notifiche arrivano per email a <strong>${esc(mail)}</strong>.</p>
+        <div class="row-btns"><button type="button" class="btn" data-act="test-notify">Invia una prova</button></div>` : '<p class="hint">Nessun indirizzo email configurato: esegui setup() nello script.</p>'}
       </fieldset>
       ${c.mode === 'display' ? '' : `<fieldset><legend>Prodotti che finiscono spesso</legend>
         <div class="chips" id="usuals">${usualsHtml()}</div>
@@ -589,7 +589,7 @@ document.addEventListener('click', ev => {
       if (inp && inp.value.trim()) { upsert('Abituali', { id: rid(), prodotto: inp.value.trim() }); inp.value = ''; refreshSettingsList(); }
       break;
     }
-    case 'test-notify': apiPost({ action: 'test' }).then(r => toast(r.ok ? 'Prova inviata.' : 'Non riesco a inviare: ' + (r.error || 'controlla il canale.'))).catch(() => toast('Nessuna rete.')); break;
+    case 'test-notify': apiPost({ action: 'test' }).then(r => toast(r.ok ? 'Prova inviata.' : 'Non riesco a inviare: ' + (r.error || 'controlla lo script.'))).catch(() => toast('Nessuna rete.')); break;
     case 'reset':
       if (confirm('Scollegare questo dispositivo dal planner?')) {
         localStorage.removeItem(LS_CFG); localStorage.removeItem(LS_CACHE); localStorage.removeItem(LS_QUEUE);

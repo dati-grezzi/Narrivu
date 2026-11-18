@@ -49,7 +49,8 @@ const ctx = {
     formatDate: (d, tz, f) => fmt(d, f),
     sleep: () => {}
   },
-  Session: { getScriptTimeZone: () => 'Europe/Rome' },
+  Session: { getScriptTimeZone: () => 'Europe/Rome', getEffectiveUser: () => ({ getEmail: () => 'casa@example.com' }) },
+  MailApp: { sendEmail: o => { sent.push({ body: { title: o.subject, message: o.body, to: o.to } }); } },
   ScriptApp: {
     getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ABC/exec' }),
     getProjectTriggers: () => triggers, deleteTrigger() {},
@@ -66,10 +67,10 @@ ctx.setup();
 const TOKEN = props.TOKEN;
 t('setup crea schede, token e canale', () => {
   ['Eventi', 'Scadenze', 'Promemoria', 'Spesa', 'Abituali'].forEach(k => assert(sheets[k], 'manca ' + k));
-  assert(TOKEN && TOKEN.length >= 20); assert(/^casa-/.test(props.NTFY_TOPIC));
+  assert(TOKEN && TOKEN.length >= 20); assert.strictEqual(props.EMAIL_DESTINATARI, 'casa@example.com');
 });
 t('token errato rifiutato', () => assert.strictEqual(call({ token: 'x', action: 'list' }, false).ok, false));
-t('list restituisce config e dati', () => { const r = call({ token: TOKEN, action: 'list' }, false); assert(r.ok && r.data.abituali.length > 0 && r.config.ntfyTopic); });
+t('list restituisce config e dati', () => { const r = call({ token: TOKEN, action: 'list' }, false); assert(r.ok && r.data.abituali.length > 0 && r.config.emailDestinatari); });
 t('evento: crea e modifica', () => {
   const r = call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', titolo: 'Dentista', data: '2026-11-16', ora: '17:30', per: 'Eddie', autore: 'Lucia' } });
   assert(r.ok && r.created);
@@ -101,7 +102,7 @@ t('checkReminders: invia una sola volta, solo se scaduto', () => {
   sent.length = 0;
   clock = new Date(2026, 10, 15, 9, 0); ctx.checkReminders(); assert.strictEqual(sent.length, 0, 'prima dell\'ora');
   clock = new Date(2026, 10, 15, 9, 5); ctx.checkReminders(); assert.strictEqual(sent.length, 1);
-  assert(/idraulico/.test(sent[0].body.message + sent[0].body.title)); assert.strictEqual(sent[0].body.topic, props.NTFY_TOPIC);
+  assert(/idraulico/.test(sent[0].body.message + sent[0].body.title)); assert.strictEqual(sent[0].body.to, 'casa@example.com');
   ctx.checkReminders(); assert.strictEqual(sent.length, 1, 'doppio invio');
 });
 t('dailyJob: avvisa scadenza vicina, non due volte lo stesso giorno', () => {

@@ -1,6 +1,6 @@
 # Narrivu
 
-Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API in Apps Script, pagina su GitHub Pages, notifiche con ntfy. Nessun server da gestire.
+Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API in Apps Script, pagina su GitHub Pages, notifiche via email. Nessun server da gestire.
 
 - **Tablet a muro** (`mode=display`): sola lettura, mostra 7 giorni, scadenze e spesa.
 - **Telefoni di Alfio e Lucia** (`mode=phone`): inseriscono eventi, promemoria, scadenze e prodotti finiti. Ogni voce porta il nome di chi l'ha inserita.
@@ -12,7 +12,7 @@ Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API
 1. Crea un nuovo Google Sheet (nome a piacere, es. "Narrivu").
 2. **Estensioni > Apps Script**. Incolla il contenuto di `apps-script/Code.gs`.
 3. **Impostazioni progetto** > spunta "Mostra il file manifest appsscript.json", poi incolla il contenuto di `apps-script/appsscript.json`.
-4. Seleziona la funzione `setup` e premi **Esegui**; autorizza l'accesso. Crea le schede, il token segreto, il canale ntfy e i trigger (promemoria ogni 5 minuti, riepilogo scadenze ogni mattina alle 8).
+4. Seleziona la funzione `setup` e premi **Esegui**; autorizza l'accesso. Crea le schede, il token segreto, l'indirizzo email per le notifiche e i trigger (promemoria ogni 5 minuti, riepilogo scadenze ogni mattina alle 8).
 5. **Distribuisci > Nuova distribuzione > App web**: esegui come *te*, accesso *Chiunque*. Copia l'URL che finisce con `/exec`.
 
 ### 2. La pagina web
@@ -22,11 +22,7 @@ Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API
 4. In `Code.gs` incolla in `WEBAPP_URL` l'URL `/exec` copiato da Distribuisci > Gestisci distribuzioni, poi riesegui `showSetup`: nel registro compaiono tre link pronti (Alfio, Lucia, tablet).
 
 ### 3. Notifiche
-1. Installa **ntfy** da Play Store su entrambi i telefoni.
-2. Iscriviti al canale `casa-…` mostrato da `showSetup` (server `ntfy.sh`). In alternativa, nelle impostazioni dell'app c'è un link `ntfy://` che lo fa in un tocco.
-3. Prova con **Impostazioni (pressione lunga sul titolo) > Invia una prova** (o la funzione `testNotifica`).
-
-Chiunque conosca il nome del canale può leggere le notifiche: il nome è casuale, ma non dire di usarlo per dati sensibili.
+Le notifiche arrivano per email all'indirizzo in `EMAIL_DESTINATARI` (Impostazioni progetto > Proprietà script; più indirizzi separati da virgola). Di default è l'account che ha creato lo script. Al primo invio Google chiede l'autorizzazione a inviare email. Prova con **Impostazioni (pressione lunga sul titolo) > Invia una prova** o con la funzione `testNotifica`.
 
 ### 4. Aprire i link
 - Sui telefoni: apri il proprio link in Chrome, poi menu > **Installa app / Aggiungi a schermata Home**. Il link salva le impostazioni e si ripulisce da solo.
