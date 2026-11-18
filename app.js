@@ -473,11 +473,11 @@ function addEvent(e) {
   const ev = e || { titolo: '', data: today, ora: '', per: 'Famiglia', note: '' };
   openSheet({
     title: e ? 'Modifica impegno' : 'Nuovo impegno',
-    body: `<label>Cosa<input name="titolo" type="text" required maxlength="80" value="${esc(ev.titolo)}" placeholder="Visita, compleanno, riunione…"></label>
+    body: `${whoFieldset()}<label>Cosa<input name="titolo" type="text" required maxlength="80" value="${esc(ev.titolo)}" placeholder="Visita, compleanno, riunione…"></label>
       <div class="two"><label>Giorno<input name="data" type="date" required value="${esc(ev.data)}"></label>
       <label>Ora <small>(facoltativa)</small><input name="ora" type="time" value="${esc(ev.ora)}"></label></div>
       <fieldset><legend>Per chi</legend>${personPicker('per', ev.per)}</fieldset>
-      <label>Note <small>(facoltative)</small><input name="note" type="text" maxlength="120" value="${esc(ev.note)}"></label>${whoFieldset()}`,
+      <label>Note <small>(facoltative)</small><input name="note" type="text" maxlength="120" value="${esc(ev.note)}"></label>`,
     onSubmit: f => { rememberWho(f); return upsert('Eventi', { id: e ? e.id : rid(), titolo: f.titolo, data: f.data, ora: f.ora || '', per: f.per, note: f.note || '', autore: e ? e.autore : state.cfg.autore }); },
     onDelete: e ? () => remove('Eventi', e.id) : null
   });
@@ -489,10 +489,10 @@ function addReminder(r) {
   const rm = r || { testo: '', quando: def, per: 'Famiglia' };
   openSheet({
     title: r ? 'Modifica promemoria' : 'Nuovo promemoria',
-    body: `<label>Ricordami di<input name="testo" type="text" required maxlength="100" value="${esc(rm.testo)}" placeholder="Portare il certificato, chiamare l'idraulico…"></label>
+    body: `${whoFieldset()}<label>Ricordami di<input name="testo" type="text" required maxlength="100" value="${esc(rm.testo)}" placeholder="Portare il certificato, chiamare l'idraulico…"></label>
       <label>Quando<input name="quando" type="datetime-local" required value="${esc(rm.quando)}"></label>
       <fieldset><legend>Riguarda</legend>${personPicker('per', rm.per)}</fieldset>
-      <p class="hint">La notifica arriva per email.</p>${whoFieldset()}`,
+      <p class="hint">La notifica arriva per email.</p>`,
     onSubmit: f => { rememberWho(f); return upsert('Promemoria', { id: r ? r.id : rid(), testo: f.testo, quando: f.quando, per: f.per, autore: r ? r.autore : state.cfg.autore }); },
     onDelete: r ? () => remove('Promemoria', r.id) : null
   });
@@ -502,10 +502,10 @@ function addExpiry(s) {
   const sc = s || { prodotto: '', scadenza: addDays(ymd(new Date()), 5), avviso_giorni: '2' };
   openSheet({
     title: s ? 'Modifica scadenza' : 'Nuova scadenza',
-    body: `<label>Prodotto<input name="prodotto" type="text" required maxlength="60" value="${esc(sc.prodotto)}" placeholder="Yogurt, prosciutto, latte…"></label>
+    body: `${whoFieldset()}<label>Prodotto<input name="prodotto" type="text" required maxlength="60" value="${esc(sc.prodotto)}" placeholder="Yogurt, prosciutto, latte…"></label>
       <label>Scade il<input name="scadenza" type="date" required value="${esc(sc.scadenza)}"></label>
       <label>Avvisami<select name="avviso_giorni">${[0, 1, 2, 3, 5, 7].map(n => `<option value="${n}" ${String(n) === String(sc.avviso_giorni || '2') ? 'selected' : ''}>${n === 0 ? 'il giorno stesso' : n === 1 ? '1 giorno prima' : n + ' giorni prima'}</option>`).join('')}</select></label>
-      <p class="hint">L'avviso arriva ogni mattina tra le 8 e le 9.</p>${whoFieldset()}`,
+      <p class="hint">L'avviso arriva ogni mattina tra le 8 e le 9.</p>`,
     onSubmit: f => { rememberWho(f); return upsert('Scadenze', { id: s ? s.id : rid(), prodotto: f.prodotto, scadenza: f.scadenza, avviso_giorni: f.avviso_giorni, autore: s ? s.autore : state.cfg.autore }); },
     onDelete: s ? () => remove('Scadenze', s.id) : null
   });

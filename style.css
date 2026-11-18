@@ -264,7 +264,7 @@ legend { font-size: .85rem; font-weight: 600; padding: 0; margin-bottom: .45rem;
 .backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(14, 22, 17, .45); }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 21;
-  max-width: 640px; margin: 0 auto; max-height: 92dvh; overflow: auto;
+  max-width: 640px; margin: 0 auto; max-height: 92dvh; overflow: hidden; display: flex; flex-direction: column;
   background: var(--board); border-radius: 1.4rem 1.4rem 0 0;
   padding: 1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
   animation: up .18s ease-out;
@@ -272,7 +272,8 @@ legend { font-size: .85rem; font-weight: 600; padding: 0; margin-bottom: .45rem;
 .sheet header { display: flex; justify-content: space-between; align-items: center; }
 .sheet h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .sheet .x { border: 0; background: rgba(22, 66, 74, .08); border-radius: 50%; width: 2.4rem; height: 2.4rem; display: grid; place-items: center; }
-.sheet footer { display: flex; gap: .6rem; margin-top: 1.3rem; }
+.sheet .body { overflow-y: auto; min-height: 0; padding-bottom: .2rem; }
+.sheet footer { display: flex; gap: .6rem; margin-top: .9rem; flex: none; }
 .sheet footer .primary { flex: 1; }
 @keyframes up { from { transform: translateY(1.5rem); opacity: .6; } to { transform: none; opacity: 1; } }
 
