@@ -18,7 +18,7 @@ Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API
 ### 2. La pagina web
 1. Il codice sta nel repository `dati-grezzi/narrivu`: l'app web è nella radice, lo script in `apps-script/`.
 2. **Settings > Pages**: pubblica dal ramo `main`, cartella `/ (root)`.
-3. `PAGES_URL` in `Code.gs` è già `https://dati-grezzi.github.io/narrivu/`.
+3. `PAGES_URL` in `Code.gs` è già `https://datigrezzi.it/Narrivu/`.
 4. Riesegui `showSetup`: nel registro compaiono tre link pronti (Alfio, Lucia, tablet).
 
 ### 3. Notifiche

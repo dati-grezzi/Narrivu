@@ -71,7 +71,7 @@ function setup() {
 
 /** Stampa nel log i dati da copiare nell'app (token, canale ntfy, indirizzo). */
 /** Indirizzo della pagina su GitHub Pages (cambialo dopo la pubblicazione). */
-const PAGES_URL = 'https://dati-grezzi.github.io/narrivu/';
+const PAGES_URL = 'https://datigrezzi.it/Narrivu/';
 
 function showSetup() {
   const p = PropertiesService.getScriptProperties();
