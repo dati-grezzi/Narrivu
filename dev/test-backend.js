@@ -1,7 +1,9 @@
 'use strict';
 /* Test di Code.gs con servizi Google simulati.  Uso: node dev/test-backend.js */
 const fs = require('fs'), vm = require('vm'), path = require('path'), assert = require('assert');
-const code = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+const realCode = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+const LOADER = process.env.LOADER === '1'; // LOADER=1: prova Loader.gs, che scarica Code.gs da GitHub (simulato)
+const code = LOADER ? fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Loader.gs'), 'utf8') : realCode;
 
 const pad = n => String(n).padStart(2, '0');
 let clock = new Date(2026, 10, 15, 9, 0);
@@ -9,7 +11,7 @@ const fmt = (d, f) => f.replace("yyyy", d.getFullYear()).replace("MM", pad(d.get
   .replace("HH", pad(d.getHours())).replace("mm", pad(d.getMinutes())).replace(/'/g, '');
 class FakeDate extends Date { constructor(...a) { a.length ? super(...a) : super(+clock); } static now() { return +clock; } }
 
-const sheets = {}; const props = {}; const sent = []; const triggers = [];
+const cacheStore = {}; const fetches = []; const sheets = {}; const props = {}; const sent = []; const triggers = [];
 function mkSheet(name) {
   const rows = [];
   const sh = {
@@ -56,7 +58,8 @@ const ctx = {
     getProjectTriggers: () => triggers, deleteTrigger() {},
     newTrigger: fn => { const t = { fn }; const b = { timeBased: () => b, everyMinutes: () => b, everyDays: () => b, atHour: () => b, nearMinute: () => b, create: () => (triggers.push(t), t) }; return b; }
   },
-  UrlFetchApp: { fetch: (u, o) => { sent.push({ u, body: JSON.parse(o.payload) }); return { getResponseCode: () => 200, getContentText: () => '{}' }; } }
+  CacheService: { getScriptCache: () => ({ get: k => cacheStore[k] ?? null, put: (k, v) => { cacheStore[k] = v; }, removeAll: ks => ks.forEach(k => delete cacheStore[k]) }) },
+  UrlFetchApp: { fetch: u => { fetches.push(u); if (!/raw\.githubusercontent\.com/.test(u)) throw new Error('URL inatteso ' + u); return { getResponseCode: () => 200, getContentText: () => realCode }; } }
 };
 vm.createContext(ctx); vm.runInContext(code, ctx);
 const call = (req, post = true) => JSON.parse((post ? ctx.doPost({ postData: { contents: JSON.stringify(req) } }) : ctx.doGet({ parameter: req })).getContent());
@@ -129,4 +132,5 @@ t('dailyJob: scadenza consumata non avvisa', () => {
   assert(!sent.some(s => /Yogurt/.test(s.body.message)));
 });
 t('showSetup stampa i link', () => ctx.showSetup());
+if (LOADER) t('loader: scarica Code.gs una sola volta (cache)', () => assert.strictEqual(fetches.length, 1, 'download: ' + fetches.length));
 console.log(n + ' test superati');

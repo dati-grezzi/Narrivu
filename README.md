@@ -15,6 +15,9 @@ Agenda di famiglia indipendente da Google Calendar. Dati su un Google Sheet, API
 4. Seleziona la funzione `setup` e premi **Esegui**; autorizza l'accesso. Crea le schede, il token segreto, l'indirizzo email per le notifiche e i trigger (promemoria ogni 5 minuti, riepilogo scadenze ogni mattina alle 8).
 5. **Distribuisci > Nuova distribuzione > App web**: esegui come *te*, accesso *Chiunque*. Copia l'URL che finisce con `/exec`.
 
+#### Aggiornamento automatico dello script (consigliato)
+Invece di incollare `Code.gs`, incolla in `Codice.gs` solo `apps-script/Loader.gs` (40 righe) e il manifest aggiornato. Il caricatore scarica `Code.gs` da questo repository e lo esegue; le modifiche si pubblicano con un commit, senza riaprire l'editor. Il codice resta 5 minuti in cache (6 ore di riserva se GitHub non risponde); `aggiorna()` scarta la cache. **Attenzione:** chi può scrivere sul repository controlla lo script, quindi tienilo privato o solo tuo.
+
 ### 2. La pagina web
 1. Il codice sta nel repository `dati-grezzi/narrivu`: l'app web è nella radice, lo script in `apps-script/`.
 2. **Settings > Pages**: pubblica dal ramo `main`, cartella `/ (root)`.
