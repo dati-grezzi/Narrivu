@@ -7,7 +7,8 @@ const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
-const VERSION = 'v18'; // tenere uguale a CACHE in sw.js
+const IDLE_MS = 120000; // tablet: dopo due minuti senza tocchi torna alla settimana corrente
+const VERSION = 'v19'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -26,6 +27,8 @@ function nowLocal() { const d = new Date(); return ymd(d) + 'T' + pad(d.getHours
 const fmtDow = new Intl.DateTimeFormat('it-IT', { weekday: 'long' });
 const fmtDowShort = new Intl.DateTimeFormat('it-IT', { weekday: 'short' });
 const fmtDM = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long' });
+const fmtMonth = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
+const fmtDMshort = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
 const fmtShort = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
 const dowShort = s => fmtDowShort.format(parseYmd(s)).replace('.', '');
 
@@ -47,6 +50,8 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  left: '<svg viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>'
 };
 const ico = n => '<span class="ico" aria-hidden="true">' + ICON[n] + '</span>';
@@ -61,8 +66,11 @@ const state = {
   online: true,
   err: '',
   authError: false,
-  tab: 'agenda'
+  tab: 'agenda',
+  view: 'week', // tablet: 'week' | 'month'
+  off: 0        // tablet: spostamento in settimane (o mesi) rispetto a oggi
 };
+let lastTouch = Date.now();
 let queue = load(LS_QUEUE, []);
 const cached = load(LS_CACHE, null);
 if (cached && cached.data) { state.data = { ...emptyData(), ...cached.data }; state.config = cached.config || {}; state.lastSync = cached.lastSync || null; }
@@ -200,9 +208,21 @@ function boot() {
   if (state.cfg) refresh();
   setInterval(() => { if (!document.hidden) refresh(); }, SYNC_MS);
   setInterval(() => { if (isDisplay()) render(); }, 30000);
+  setInterval(backToToday, 5000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { refresh(); wake(); } });
   window.addEventListener('online', () => refresh());
   wake();
+}
+
+/* Tablet: dopo un po' senza tocchi torna alla settimana corrente e chiude il dettaglio di un giorno */
+function backToToday() {
+  if (!isDisplay() || Date.now() - lastTouch < IDLE_MS) return;
+  const away = state.view !== 'week' || state.off !== 0;
+  const detail = state.sheet && state.sheet.detail;
+  if (!away && !detail) return;
+  state.view = 'week'; state.off = 0;
+  if (detail) closeSheet(); // ridisegna da sé se serviva
+  render();
 }
 
 let wakeLock = null;
@@ -285,7 +305,7 @@ function isNight(d) {
 function dayItems(day, now) {
   const items = [];
   state.data.eventi.filter(e => e.data === day).forEach(e => {
-    items.push({ kind: 'ev', time: e.ora, title: e.titolo, per: e.per, autore: e.autore, past: day === ymd(now) && e.ora && e.ora < pad(now.getHours()) + ':' + pad(now.getMinutes()) });
+    items.push({ kind: 'ev', time: e.ora, title: e.titolo, note: e.note, per: e.per, autore: e.autore, past: day === ymd(now) && e.ora && e.ora < pad(now.getHours()) + ':' + pad(now.getMinutes()) });
   });
   state.data.promemoria.filter(r => r.quando.slice(0, 10) === day).forEach(r => {
     items.push({ kind: 'rem', time: r.quando.slice(11, 16), title: r.testo, per: r.per, autore: r.autore, past: r.inviato === 'si' });
@@ -326,17 +346,7 @@ function renderDisplay() {
   const today = ymd(now);
   document.body.classList.toggle('night', isNight(now));
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
-  const rows = days.map((day, i) => {
-    const items = dayItems(day, now);
-    const cap = i === 0 ? 8 : 4;
-    const shown = items.slice(0, cap).map(chip).join('');
-    const more = items.length > cap ? `<span class="more">+${items.length - cap} altri</span>` : '';
-    const empty = !items.length ? '<span class="none">libero</span>' : '';
-    return `<div class="day ${i === 0 ? 'today' : ''}">
-      <div class="dl"><span class="dw">${esc(i === 0 ? 'oggi' : dowShort(day))}</span><span class="dn">${parseYmd(day).getDate()}</span></div>
-      <div class="items">${shown}${more}${empty}</div></div>`;
-  }).join('');
+  const body = state.view === 'month' ? monthHtml(now, today) : weekHtml(now, today);
 
   const scad = state.data.scadenze.filter(s => s.consumato !== 'si')
     .map(s => ({ ...s, giorni: diffDays(today, s.scadenza) }))
@@ -358,12 +368,7 @@ function renderDisplay() {
       <div class="clock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
       <div id="sync" class="sync"></div>
     </header>
-    <section class="week" aria-label="Prossimi sette giorni">${rows}
-      <footer class="legend" aria-label="Legenda">
-        ${PERSONE.map(p => `<span class="mag mini p-${slug(p)}">${esc(p)}</span>`).join('')}
-        <span class="mag mini rem p-famiglia">${ico('bell')}promemoria</span>
-      </footer>
-    </section>
+    ${body}
     <aside class="side">
       <section class="panel scad"><h2>Scadenze <small>${scad.length}</small></h2>
         <ul>${scadRows || '<li class="none">Niente in scadenza.</li>'}${scadMore}</ul></section>
@@ -372,6 +377,79 @@ function renderDisplay() {
     </aside>
   </main>${sheetShell()}`;
   paintSync($('#sync'));
+}
+
+
+/* ----- tablet: settimana e mese ----- */
+function viewNav(label) {
+  const v = state.view;
+  return `<div class="nav">
+    <div class="vseg" role="group" aria-label="Vista"><button data-act="view" data-v="week" class="${v === 'week' ? 'on' : ''}">Settimana</button><button data-act="view" data-v="month" class="${v === 'month' ? 'on' : ''}">Mese</button></div>
+    <button class="arrow" data-act="nav" data-d="-1" aria-label="${v === 'month' ? 'Mese precedente' : 'Settimana precedente'}">${ico('left')}</button>
+    <span class="range">${esc(label)}</span>
+    <button class="arrow" data-act="nav" data-d="1" aria-label="${v === 'month' ? 'Mese successivo' : 'Settimana successiva'}">${ico('right')}</button>
+    <button class="today-btn" data-act="today" ${state.view === 'week' && !state.off ? 'disabled' : ''}>Oggi</button>
+  </div>`;
+}
+const legendHtml = () => `<footer class="legend" aria-label="Legenda">
+  ${PERSONE.map(p => `<span class="mag mini p-${slug(p)}">${esc(p)}</span>`).join('')}
+  <span class="mag mini rem p-famiglia">${ico('bell')}promemoria</span></footer>`;
+
+function weekHtml(now, today) {
+  const off = state.off;
+  const start = addDays(today, 7 * off);
+  const rows = Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((day, i) => {
+    const isToday = day === today;
+    const items = dayItems(day, now);
+    const cap = isToday ? 8 : 4;
+    const shown = items.slice(0, cap).map(chip).join('');
+    const more = items.length > cap ? `<span class="more">+${items.length - cap} altri</span>` : '';
+    const empty = !items.length ? '<span class="none">libero</span>' : '';
+    return `<div class="day ${isToday ? 'today' : ''} ${day < today ? 'gone' : ''}" data-act="day" data-day="${day}">
+      <div class="dl"><span class="dw">${esc(isToday ? 'oggi' : dowShort(day))}</span><span class="dn">${parseYmd(day).getDate()}</span></div>
+      <div class="items">${shown}${more}${empty}</div></div>`;
+  }).join('');
+  const label = off === 0 ? 'Prossimi 7 giorni' : fmtDMshort.format(parseYmd(start)).replace('.', '') + ' – ' + fmtDMshort.format(parseYmd(addDays(start, 6))).replace('.', '');
+  return `<section class="week ${off === 0 ? 'now' : ''}" aria-label="Settimana">
+    ${viewNav(label)}<div class="rows">${rows}</div>${legendHtml()}</section>`;
+}
+
+function monthHtml(now, today) {
+  const first = new Date(now.getFullYear(), now.getMonth() + state.off, 1, 12);
+  const firstYmd = ymd(first), month = first.getMonth();
+  const lead = (first.getDay() + 6) % 7; // lunedì = 0
+  const nDays = new Date(first.getFullYear(), month + 1, 0).getDate();
+  const weeks = Math.ceil((lead + nDays) / 7);
+  const cap = weeks > 5 ? 2 : 3;
+  const head = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'].map(d => `<span>${d}</span>`).join('');
+  let cells = '';
+  for (let i = 0; i < weeks * 7; i++) {
+    const day = addDays(firstYmd, i - lead);
+    const inMonth = parseYmd(day).getMonth() === month;
+    const items = dayItems(day, now);
+    const fit = items.length > cap ? cap - 1 : cap;
+    const pills = items.slice(0, fit).map(it => `<span class="pill p-${slug(it.per)} ${it.kind}">${esc(it.title)}</span>`).join('');
+    const more = items.length > fit ? `<span class="pmore">+${items.length - fit} altri</span>` : '';
+    cells += `<button class="cell ${inMonth ? '' : 'out'} ${day === today ? 'today' : ''} ${day < today ? 'gone' : ''}" data-act="day" data-day="${day}">
+      <span class="num">${parseYmd(day).getDate()}</span><span class="pills">${pills}${more}</span></button>`;
+  }
+  const label = fmtMonth.format(first);
+  return `<section class="month" aria-label="Mese">
+    ${viewNav(label.charAt(0).toUpperCase() + label.slice(1))}
+    <div class="mhead">${head}</div><div class="mgrid" style="--weeks:${weeks}">${cells}</div>${legendHtml()}</section>`;
+}
+
+function showDay(day) {
+  const now = new Date(), today = ymd(now);
+  const items = dayItems(day, now);
+  const t = fmtDow.format(parseYmd(day)) + ' ' + fmtDM.format(parseYmd(day));
+  openSheet({
+    title: day === today ? 'Oggi, ' + fmtDM.format(parseYmd(day)) : t.charAt(0).toUpperCase() + t.slice(1),
+    detail: true, submit: null,
+    body: () => items.length
+      ? `<ul class="dlist">${items.map(it => `<li>${chip(it)}${it.note ? `<span class="note">${esc(it.note)}</span>` : ''}</li>`).join('')}</ul>`
+      : '<p class="hint">Niente in programma.</p>'
+  });
 }
 
 /* ----- telefono ----- */
@@ -625,6 +703,10 @@ document.addEventListener('click', ev => {
     case 'done-sc': upsert('Scadenze', { id, consumato: 'si' }); toast('Tolto dalle scadenze.'); break;
     case 'finito': finito(t.dataset.p); break;
     case 'clear-bought': state.data.spesa.filter(s => s.stato === 'comprato').forEach(s => remove('Spesa', s.id)); break;
+    case 'view': state.view = t.dataset.v; state.off = 0; render(); break;
+    case 'nav': state.off += Number(t.dataset.d); render(); break;
+    case 'today': state.view = 'week'; state.off = 0; render(); break;
+    case 'day': showDay(t.dataset.day); break;
     case 'settings': openSettings(); break;
     case 'close': closeSheet(); break;
     case 'sheet-delete': if (state.sheet && state.sheet.onDelete) { state.sheet.onDelete(); closeSheet(); } break;
@@ -691,6 +773,7 @@ function refreshSettingsList() {
 /* Tablet: tenendo premuta l'intestazione si aprono le impostazioni */
 let holdTimer = null;
 document.addEventListener('pointerdown', ev => {
+  lastTouch = Date.now();
   if (ev.target.closest('[data-hold]')) holdTimer = setTimeout(openSettings, 1500);
 });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => document.addEventListener(n, () => clearTimeout(holdTimer)));
