@@ -8,7 +8,7 @@ const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', 
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
 const IDLE_MS = 120000; // tablet: dopo due minuti senza tocchi torna alla settimana corrente
-const VERSION = 'v19'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v20'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -367,6 +367,7 @@ function renderDisplay() {
       <div class="date"><span class="dow">${esc(fmtDow.format(now))}</span> <span class="dm">${esc(fmtDM.format(now))}</span></div>
       <div class="clock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
       <div id="sync" class="sync"></div>
+      <small class="ver dver">${VERSION}</small>
     </header>
     ${body}
     <aside class="side">
