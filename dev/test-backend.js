@@ -29,7 +29,7 @@ function mkSheet(name) {
     appendRow: r => rows.push(r.slice()),
     deleteRow: i => rows.splice(i - 1, 1),
     setFrozenRows() {}, setColumnWidth() {}, autoResizeColumns() {}, getName: () => name,
-    getMaxRows: () => 1000
+    getMaxRows: () => 1000, getMaxColumns: () => 26, insertColumnsAfter() {}
   };
   return sh;
 }
@@ -93,6 +93,13 @@ t('evento: crea e modifica', () => {
   call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev001', ora: '18:00' } });
   const e = call({ token: TOKEN, action: 'list' }, false).data.eventi.find(x => x.id === 'ev001');
   assert.strictEqual(e.ora, '18:00'); assert.strictEqual(e.titolo, 'Dentista'); assert.strictEqual(e.autore, 'Lucia');
+});
+t('evento: ora di fine valida e controllata', () => {
+  assert(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { id: 'ev002', titolo: 'Riunione', data: '2026-11-17', ora: '15:00', ora_fine: '16:30', per: 'Famiglia', autore: 'Alfio' } }).ok);
+  assert.strictEqual(call({ token: TOKEN, action: 'list' }, false).data.eventi.find(x => x.id === 'ev002').ora_fine, '16:30');
+  assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '2026-11-17', ora: '15:00', ora_fine: '14:00', per: 'Famiglia', autore: 'Alfio' } }).ok, false);
+  assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '2026-11-17', ora: '', ora_fine: '14:00', per: 'Famiglia', autore: 'Alfio' } }).ok, false);
+  call({ token: TOKEN, action: 'remove', tab: 'Eventi', id: 'ev002' });
 });
 t('validazione: persona, data, autore', () => {
   assert.strictEqual(call({ token: TOKEN, action: 'upsert', tab: 'Eventi', row: { titolo: 'x', data: '2026-11-16', per: 'Nonno', autore: 'Alfio' } }).ok, false);

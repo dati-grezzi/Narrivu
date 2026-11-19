@@ -8,7 +8,7 @@ const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', 
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
 const IDLE_MS = 120000; // tablet: dopo due minuti senza tocchi torna alla settimana corrente
-const VERSION = 'v22'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v23'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -305,7 +305,7 @@ function isNight(d) {
 function dayItems(day, now) {
   const items = [];
   state.data.eventi.filter(e => e.data === day).forEach(e => {
-    items.push({ kind: 'ev', time: e.ora, title: e.titolo, note: e.note, per: e.per, autore: e.autore, past: day === ymd(now) && e.ora && e.ora < pad(now.getHours()) + ':' + pad(now.getMinutes()) });
+    items.push({ kind: 'ev', time: e.ora, end: e.ora_fine, title: e.titolo, note: e.note, per: e.per, autore: e.autore, past: day === ymd(now) && (e.ora_fine || e.ora) && (e.ora_fine || e.ora) < pad(now.getHours()) + ':' + pad(now.getMinutes()) });
   });
   state.data.promemoria.filter(r => r.quando.slice(0, 10) === day).forEach(r => {
     items.push({ kind: 'rem', time: r.quando.slice(11, 16), title: r.testo, per: r.per, autore: r.autore, past: r.inviato === 'si' });
@@ -315,7 +315,7 @@ function dayItems(day, now) {
 }
 
 function chip(it) {
-  const time = it.time ? `<span class="t">${esc(it.time)}</span>` : '';
+  const time = it.time ? `<span class="t">${esc(it.time)}${it.end ? '–' + esc(it.end) : ''}</span>` : '';
   const bell = it.kind === 'rem' ? ico('bell') : '';
   return `<span class="mag p-${slug(it.per)} ${it.kind} ${it.past ? 'past' : ''}">
     <span class="au" title="Inserito da ${esc(it.autore)}">${esc((it.autore || '?')[0])}</span>${bell}${time}<span class="tx">${esc(it.title)}</span></span>`;
@@ -497,7 +497,7 @@ function viewAgenda(today) {
   evs.forEach(e => {
     if (e.data !== cur) { cur = e.data; html += `<h2 class="dayh">${esc(dayLabel(cur, today))}</h2>`; }
     html += `<button class="row p-${slug(e.per)}" data-act="edit-ev" data-id="${esc(e.id)}">
-      <span class="when">${esc(e.ora || 'tutto il giorno')}</span>
+      <span class="when">${e.ora ? esc(e.ora) + (e.ora_fine ? '<small>' + esc(e.ora_fine) + '</small>' : '') : 'tutto il giorno'}</span>
       <span class="main"><strong>${esc(e.titolo)}</strong>${e.note ? `<em>${esc(e.note)}</em>` : ''}</span>
       <span class="meta">${personTag(e.per)}<small>da ${esc(e.autore)}</small></span></button>`;
   });
@@ -587,15 +587,20 @@ function rememberWho(f) { if (f.who && AUTORI.includes(f.who) && !state.cfg.auto
 
 function addEvent(e) {
   const today = ymd(new Date());
-  const ev = e || { titolo: '', data: today, ora: '', per: 'Famiglia', note: '' };
+  const ev = e || { titolo: '', data: today, ora: '', ora_fine: '', per: 'Famiglia', note: '' };
   openSheet({
     title: e ? 'Modifica impegno' : 'Nuovo impegno',
     body: `${whoFieldset()}<label>Cosa<input name="titolo" type="text" required maxlength="80" value="${esc(ev.titolo)}" placeholder="Visita, compleanno, riunione…"></label>
-      <div class="two"><label>Giorno<input name="data" type="date" required value="${esc(ev.data)}"></label>
-      <label>Ora <small>(facoltativa)</small><input name="ora" type="time" value="${esc(ev.ora)}"></label></div>
+      <label>Giorno<input name="data" type="date" required value="${esc(ev.data)}"></label>
+      <div class="two"><label>Dalle <small>(facoltativa)</small><input name="ora" type="time" value="${esc(ev.ora)}"></label>
+      <label>Alle <small>(facoltativa)</small><input name="ora_fine" type="time" value="${esc(ev.ora_fine || '')}"></label></div>
+      <p class="hint">Senza orari è tutto il giorno. Con solo «Dalle» l'impegno ha un inizio e nessuna fine.</p>
       <fieldset><legend>Per chi</legend>${personPicker('per', ev.per)}</fieldset>
       <label>Note <small>(facoltative)</small><input name="note" type="text" maxlength="120" value="${esc(ev.note)}"></label>`,
-    onSubmit: f => { rememberWho(f); return upsert('Eventi', { id: e ? e.id : rid(), titolo: f.titolo, data: f.data, ora: f.ora || '', per: f.per, note: f.note || '', autore: e ? e.autore : state.cfg.autore }); },
+    onSubmit: f => {
+      if (f.ora_fine && !f.ora) { toast('Indica anche l\'ora di inizio.'); return addEvent({ ...ev, ...f, id: e && e.id, autore: e && e.autore }); }
+      if (f.ora_fine && f.ora && f.ora_fine <= f.ora) { toast('La fine deve essere dopo l\'inizio.'); return addEvent({ ...ev, ...f, id: e && e.id, autore: e && e.autore }); }
+      rememberWho(f); return upsert('Eventi', { id: e ? e.id : rid(), titolo: f.titolo, data: f.data, ora: f.ora || '', ora_fine: f.ora ? (f.ora_fine || '') : '', per: f.per, note: f.note || '', autore: e ? e.autore : state.cfg.autore }); },
     onDelete: e ? () => remove('Eventi', e.id) : null
   });
 }

@@ -15,7 +15,7 @@ const AUTORI = ['Alfio', 'Lucia'];                      // chi inserisce
 const STATI_SPESA = ['da_comprare', 'comprato'];
 
 const TABS = {
-  Eventi:     ['id', 'titolo', 'data', 'ora', 'per', 'autore', 'note', 'creato'],
+  Eventi:     ['id', 'titolo', 'data', 'ora', 'per', 'autore', 'note', 'creato', 'ora_fine'], // ora_fine in coda: i fogli esistenti restano validi
   Scadenze:   ['id', 'prodotto', 'scadenza', 'avviso_giorni', 'autore', 'creato', 'consumato', 'ultimo_avviso'],
   Promemoria: ['id', 'testo', 'quando', 'per', 'autore', 'creato', 'inviato'],
   Spesa:      ['id', 'prodotto', 'stato', 'autore', 'creato', 'aggiornato'],
@@ -24,7 +24,7 @@ const TABS = {
 
 // Colonne che il client può scrivere (id e campi di servizio li gestisce il server)
 const EDITABLE = {
-  Eventi:     ['titolo', 'data', 'ora', 'per', 'autore', 'note'],
+  Eventi:     ['titolo', 'data', 'ora', 'ora_fine', 'per', 'autore', 'note'],
   Scadenze:   ['prodotto', 'scadenza', 'avviso_giorni', 'autore', 'consumato'],
   Promemoria: ['testo', 'quando', 'per', 'autore'],
   Spesa:      ['prodotto', 'stato', 'autore'],
@@ -205,6 +205,11 @@ function sheet_(name) {
   if (!TABS[name]) throw new Error('Tab non valida');
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) throw new Error('Manca il foglio ' + name + ': esegui setup()');
+  // Se il foglio è stato creato con meno colonne (versioni precedenti), aggiunge le intestazioni mancanti
+  const cols = TABS[name];
+  if (sh.getMaxColumns() < cols.length) sh.insertColumnsAfter(sh.getMaxColumns(), cols.length - sh.getMaxColumns());
+  const head = sh.getRange(1, 1, 1, cols.length).getValues()[0];
+  for (let i = 0; i < cols.length; i++) if (head[i] !== cols[i]) sh.getRange(1, i + 1).setValue(cols[i]);
   return sh;
 }
 
@@ -318,7 +323,7 @@ function sanitize_(tab, row) {
       case 'data': case 'scadenza':
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error('Data non valida');
         break;
-      case 'ora':
+      case 'ora': case 'ora_fine':
         if (v !== '' && !/^\d{2}:\d{2}$/.test(v)) throw new Error('Ora non valida');
         break;
       case 'quando':
@@ -345,6 +350,10 @@ function sanitize_(tab, row) {
     }
     out[k] = v;
   });
+  if (tab === 'Eventi' && out.ora_fine) {
+    if (out.ora !== undefined && !out.ora) throw new Error('Manca l\'ora di inizio');
+    if (out.ora && out.ora_fine <= out.ora) throw new Error('La fine deve essere dopo l\'inizio');
+  }
   return out;
 }
 

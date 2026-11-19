@@ -23,10 +23,10 @@ const id = () => 'm' + (++seq).toString(36).padStart(5, '0');
 
 const db = {
   eventi: [
-    { id: id(), titolo: 'Dentista', data: day(0), ora: '17:30', per: 'Eddie', autore: 'Lucia', note: '', creato: now() },
+    { id: id(), titolo: 'Dentista', data: day(0), ora: '17:30', ora_fine: '18:30', per: 'Eddie', autore: 'Lucia', note: '', creato: now() },
     { id: id(), titolo: 'Cena dai nonni', data: day(0), ora: '20:00', per: 'Famiglia', autore: 'Alfio', note: '', creato: now() },
     { id: id(), titolo: 'Nuoto', data: day(1), ora: '16:00', per: 'Zaja', autore: 'Lucia', note: 'Portare la cuffia', creato: now() },
-    { id: id(), titolo: 'Colloquio', data: day(1), ora: '10:30', per: 'Lucia', autore: 'Lucia', note: '', creato: now() },
+    { id: id(), titolo: 'Colloquio', data: day(1), ora: '10:30', ora_fine: '11:15', per: 'Lucia', autore: 'Lucia', note: '', creato: now() },
     { id: id(), titolo: 'Veterinario', data: day(2), ora: '09:15', per: 'Zaja', autore: 'Alfio', note: 'Vaccino', creato: now() },
     { id: id(), titolo: 'Festa di Matteo', data: day(3), ora: '', per: 'Eddie', autore: 'Lucia', note: '', creato: now() },
     { id: id(), titolo: 'Consiglio di classe', data: day(4), ora: '15:00', per: 'Famiglia', autore: 'Alfio', note: '', creato: now() },
@@ -58,7 +58,7 @@ const db = {
 
 function sanitize(tab, row) {
   const ok = {
-    Eventi: ['titolo', 'data', 'ora', 'per', 'autore', 'note'],
+    Eventi: ['titolo', 'data', 'ora', 'ora_fine', 'per', 'autore', 'note'],
     Scadenze: ['prodotto', 'scadenza', 'avviso_giorni', 'autore', 'consumato'],
     Promemoria: ['testo', 'quando', 'per', 'autore'],
     Spesa: ['prodotto', 'stato', 'autore'],
@@ -70,7 +70,7 @@ function sanitize(tab, row) {
     if (row[k] == null) return;
     const v = String(row[k]).trim().slice(0, 200);
     if ((k === 'data' || k === 'scadenza') && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error('Data non valida');
-    if (k === 'ora' && v && !/^\d{2}:\d{2}$/.test(v)) throw new Error('Ora non valida');
+    if ((k === 'ora' || k === 'ora_fine') && v && !/^\d{2}:\d{2}$/.test(v)) throw new Error('Ora non valida');
     if (k === 'quando' && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) throw new Error('Data e ora non valide');
     if (k === 'per' && !PERSONE.includes(v)) throw new Error('Destinatario non valido');
     if (k === 'autore' && !AUTORI.includes(v)) throw new Error('Autore non valido');
