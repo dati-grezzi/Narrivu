@@ -8,7 +8,7 @@ const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', 
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
 const SYNC_MS = 45000;
 const IDLE_MS = 120000; // tablet: dopo due minuti senza tocchi torna alla settimana corrente
-const VERSION = 'v20'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v21'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -775,6 +775,11 @@ function refreshSettingsList() {
 let holdTimer = null;
 document.addEventListener('pointerdown', ev => {
   lastTouch = Date.now();
+  // Tablet: al primo tocco passa a schermo intero (nasconde barre del browser e di sistema) e riprende lo schermo sempre acceso
+  if (isDisplay()) {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    if (!wakeLock || wakeLock.released) wake();
+  }
   if (ev.target.closest('[data-hold]')) holdTimer = setTimeout(openSettings, 1500);
 });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => document.addEventListener(n, () => clearTimeout(holdTimer)));
