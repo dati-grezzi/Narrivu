@@ -6,9 +6,11 @@ const PERSONE = ['Famiglia', 'Alfio', 'Lucia', 'Eddie', 'Zaja'];
 const AUTORI = ['Alfio', 'Lucia'];
 const KEY = { Eventi: 'eventi', Scadenze: 'scadenze', Promemoria: 'promemoria', Spesa: 'spesa', Abituali: 'abituali' };
 const LS_CFG = 'planner.cfg', LS_CACHE = 'planner.cache', LS_QUEUE = 'planner.queue';
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const SYNC_MS = 45000;
+const CATEGORIE = ['Frutta', 'Verdura', 'Frigo', 'Carne', 'Pesce', 'Varie', 'Surgelati', 'Saponi e detersivi']; // ordine = giro del supermercato
 const IDLE_MS = 120000; // tablet: dopo due minuti senza tocchi torna alla settimana corrente
-const VERSION = 'v23'; // tenere uguale a CACHE in sw.js
+const VERSION = 'v24'; // tenere uguale a CACHE in sw.js
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -67,6 +69,8 @@ const state = {
   err: '',
   authError: false,
   tab: 'agenda',
+  sp: 'lista',      // Spesa: 'lista' | 'aggiungi'
+  lastCat: 'Varie',
   view: 'week', // tablet: 'week' | 'month'
   off: 0        // tablet: spostamento in settimane (o mesi) rispetto a oggi
 };
@@ -359,8 +363,13 @@ function renderDisplay() {
 
   const spesa = state.data.spesa.filter(s => s.stato === 'da_comprare')
     .sort((a, b) => (a.creato || '').localeCompare(b.creato || ''));
-  const spesaRows = spesa.slice(0, 12).map(s => `<li>${esc(s.prodotto)}</li>`).join('');
-  const spesaMore = spesa.length > 12 ? `<li class="more">+${spesa.length - 12} altri</li>` : '';
+  let left = 14, spesaRows = '';
+  groupByCat(spesa, catOf).forEach(([c, list]) => {
+    if (left <= 0) return;
+    const part = list.slice(0, left); left -= part.length;
+    spesaRows += `<li class="cat">${esc(c)}</li>` + part.map(s => `<li>${esc(s.prodotto)}</li>`).join('');
+  });
+  const spesaMore = spesa.length > 14 ? `<li class="more">+${spesa.length - 14} altri</li>` : '';
 
   $('#root').innerHTML = `<main class="display">
     <header class="top" data-hold="settings">
@@ -533,19 +542,38 @@ function viewScadenze(today) {
   }).join('');
 }
 
+const catValida = c => CATEGORIE.includes(c) ? c : null;
+/** Categoria di un prodotto in lista: quella salvata, altrimenti quella dell'abituale con lo stesso nome, altrimenti Varie */
+function catOf(s) {
+  const a = state.data.abituali.find(x => x.prodotto.toLowerCase() === s.prodotto.toLowerCase());
+  return catValida(s.categoria) || (a && catValida(a.categoria)) || 'Varie';
+}
+const groupByCat = (list, fn) => CATEGORIE.map(c => [c, list.filter(x => fn(x) === c)]).filter(g => g[1].length);
+const catSelect = (name, sel) => `<select name="${name}" aria-label="Categoria">${CATEGORIE.map(c => `<option ${c === sel ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
+
 function viewSpesa() {
   const items = state.data.spesa;
   const open = items.filter(s => s.stato === 'da_comprare').sort((a, b) => (a.creato || '').localeCompare(b.creato || ''));
   const bought = items.filter(s => s.stato === 'comprato');
-  const inList = new Set(open.map(s => s.prodotto.toLowerCase()));
-  const usuals = state.data.abituali.slice().sort((a, b) => a.prodotto.localeCompare(b.prodotto, 'it'));
-  return `<section class="block"><h2 class="dayh">È finito?</h2>
-      <div class="chips">${usuals.map(u => `<button class="chipbtn ${inList.has(u.prodotto.toLowerCase()) ? 'on' : ''}" data-act="finito" data-p="${esc(u.prodotto)}">${inList.has(u.prodotto.toLowerCase()) ? ico('check') : ''}${esc(u.prodotto)}</button>`).join('') || '<em class="hint">Aggiungi i prodotti che finiscono più spesso dalle impostazioni.</em>'}</div>
-      <form class="inline" data-form="spesa-add"><input name="prodotto" placeholder="Altro prodotto" autocomplete="off" required><button class="btn primary" type="submit">Aggiungi</button></form></section>
-    <section class="block"><h2 class="dayh">Da comprare <small>${open.length}</small></h2>
-      ${open.length ? open.map(s => `<label class="check"><input type="checkbox" data-act="buy" data-id="${esc(s.id)}"><span class="box">${ico('check')}</span><span class="tx">${esc(s.prodotto)}</span></label>`).join('') : '<p class="hint">La lista è vuota. Tocca un prodotto qui sopra quando finisce.</p>'}</section>
-    ${bought.length ? `<section class="block"><h2 class="dayh">Presi <button class="btn small" data-act="clear-bought">Togli i presi</button></h2>
-      ${bought.map(s => `<label class="check done"><input type="checkbox" checked data-act="unbuy" data-id="${esc(s.id)}"><span class="box">${ico('check')}</span><span class="tx">${esc(s.prodotto)}</span></label>`).join('')}</section>` : ''}`;
+  const seg = `<div class="spseg" role="group"><button data-act="sp" data-v="lista" class="${state.sp === 'lista' ? 'on' : ''}">Lista${open.length ? ` <b>${open.length}</b>` : ''}</button><button data-act="sp" data-v="aggiungi" class="${state.sp === 'aggiungi' ? 'on' : ''}">Aggiungi</button></div>`;
+  const row = (s, done) => `<label class="check ${done ? 'done' : ''}"><input type="checkbox" ${done ? 'checked' : ''} data-act="${done ? 'unbuy' : 'buy'}" data-id="${esc(s.id)}"><span class="box">${ico('check')}</span><span class="tx">${esc(s.prodotto)}</span></label>`;
+
+  if (state.sp === 'aggiungi') {
+    const inList = new Set(open.map(s => s.prodotto.toLowerCase()));
+    const groups = groupByCat(state.data.abituali, a => catValida(a.categoria) || 'Varie');
+    return `${seg}<section class="block"><form class="addnew" data-form="spesa-add">
+        <input name="prodotto" placeholder="Cerca o scrivi un prodotto" autocomplete="off" enterkeyhint="done">
+        ${catSelect('categoria', state.lastCat)}
+        <button class="btn primary" type="submit">Aggiungi</button></form>
+        <p class="hint">Tocca un prodotto quando è finito. Se non c'è, scrivilo qui sopra e sceglie la categoria.</p></section>
+      <div id="catalogo">${groups.map(([c, list]) => `<section class="block catblk"><h2 class="dayh">${esc(c)}</h2>
+        <div class="chips">${list.sort((x, y) => x.prodotto.localeCompare(y.prodotto, 'it')).map(u => { const on = inList.has(u.prodotto.toLowerCase()); return `<button class="chipbtn ${on ? 'on' : ''}" data-act="finito" data-p="${esc(u.prodotto)}" data-cat="${esc(c)}">${on ? ico('check') : ''}${esc(u.prodotto)}</button>`; }).join('')}</div></section>`).join('') || '<p class="hint">Il catalogo è vuoto: aggiungi i prodotti dalle impostazioni.</p>'}</div>`;
+  }
+
+  const groups = groupByCat(open, catOf);
+  return `${seg}${groups.length ? groups.map(([c, list]) => `<section class="block"><h2 class="dayh">${esc(c)} <small>${list.length}</small></h2>${list.map(s => row(s, false)).join('')}</section>`).join('')
+      : '<section class="block"><p class="hint">La lista è vuota. Vai su «Aggiungi» e tocca i prodotti che sono finiti.</p></section>'}
+    ${bought.length ? `<section class="block"><h2 class="dayh">Presi <button class="btn small" data-act="clear-bought">Togli i presi</button></h2>${bought.map(s => row(s, true)).join('')}</section>` : ''}`;
 }
 
 /* ---------- finestre (form) ---------- */
@@ -634,8 +662,8 @@ function addExpiry(s) {
 }
 
 function usualsHtml() {
-  return state.data.abituali.slice().sort((a, b) => a.prodotto.localeCompare(b.prodotto, 'it'))
-    .map(u => `<span class="chipbtn static">${esc(u.prodotto)}<button type="button" data-act="del-usual" data-id="${esc(u.id)}" aria-label="Togli ${esc(u.prodotto)}">${ico('x')}</button></span>`).join('');
+  return groupByCat(state.data.abituali, u => catValida(u.categoria) || 'Varie').map(([c, list]) =>
+    `<div class="ucat"><h3>${esc(c)}</h3><div class="chips">${list.sort((x, y) => x.prodotto.localeCompare(y.prodotto, 'it')).map(u => `<span class="chipbtn static">${esc(u.prodotto)}<button type="button" data-act="del-usual" data-id="${esc(u.id)}" aria-label="Togli ${esc(u.prodotto)}">${ico('x')}</button></span>`).join('')}</div></div>`).join('');
 }
 
 function openSettings() {
@@ -654,7 +682,7 @@ function openSettings() {
       ${c.mode === 'display' ? '' : colorsFieldset()}
       ${c.mode === 'display' ? '' : `<fieldset><legend>Prodotti che finiscono spesso</legend>
         <div class="chips" id="usuals">${usualsHtml()}</div>
-        <div class="inline"><input name="nuovo_abituale" placeholder="Aggiungi un prodotto" autocomplete="off"><button type="button" class="btn" data-act="add-usual">Aggiungi</button></div></fieldset>`}
+        <div class="addnew"><input name="nuovo_abituale" placeholder="Aggiungi un prodotto" autocomplete="off">${catSelect('nuova_cat', state.lastCat)}<button type="button" class="btn" data-act="add-usual">Aggiungi</button></div></fieldset>`}
       <fieldset><legend>Questo dispositivo</legend>
         <div class="seg two"><label><input type="radio" name="mode" value="phone" ${c.mode !== 'display' ? 'checked' : ''}><span>Telefono</span></label>
         <label><input type="radio" name="mode" value="display" ${c.mode === 'display' ? 'checked' : ''}><span>Tablet</span></label></div>
@@ -682,14 +710,17 @@ function toast(msg) {
 /* ---------- azioni ---------- */
 const findBy = (key, id) => state.data[key].find(r => r.id === id);
 
-function finito(prodotto) {
+function finito(prodotto, categoria) {
   const p = prodotto.trim();
   if (!p) return;
   if (!state.cfg.autore) { toast('Scegli prima chi sei.'); openSettings(); return; }
   const same = state.data.spesa.find(s => s.prodotto.toLowerCase() === p.toLowerCase());
   if (same && same.stato === 'da_comprare') { toast(p + ' è già in lista.'); return; }
-  if (same) upsert('Spesa', { id: same.id, stato: 'da_comprare' });
-  else upsert('Spesa', { id: rid(), prodotto: p, stato: 'da_comprare', autore: state.cfg.autore });
+  const known = state.data.abituali.find(a => a.prodotto.toLowerCase() === p.toLowerCase());
+  const cat = catValida(categoria) || (known && catValida(known.categoria)) || (same && catOf(same)) || 'Varie';
+  if (same) upsert('Spesa', { id: same.id, stato: 'da_comprare', categoria: cat });
+  else upsert('Spesa', { id: rid(), prodotto: p, stato: 'da_comprare', autore: state.cfg.autore, categoria: cat });
+  return cat;
 }
 
 document.addEventListener('click', ev => {
@@ -707,19 +738,21 @@ document.addEventListener('click', ev => {
     case 'edit-rem': addReminder(findBy('promemoria', id)); break;
     case 'edit-sc': addExpiry(findBy('scadenze', id)); break;
     case 'done-sc': upsert('Scadenze', { id, consumato: 'si' }); toast('Tolto dalle scadenze.'); break;
-    case 'finito': finito(t.dataset.p); break;
+    case 'finito': finito(t.dataset.p, t.dataset.cat); break;
     case 'clear-bought': state.data.spesa.filter(s => s.stato === 'comprato').forEach(s => remove('Spesa', s.id)); break;
     case 'view': state.view = t.dataset.v; state.off = 0; render(); break;
     case 'nav': state.off += Number(t.dataset.d); render(); break;
     case 'today': state.view = 'week'; state.off = 0; render(); break;
     case 'day': showDay(t.dataset.day); break;
+    case 'sp': state.sp = t.dataset.v; render(); break;
     case 'settings': openSettings(); break;
     case 'close': closeSheet(); break;
     case 'sheet-delete': if (state.sheet && state.sheet.onDelete) { state.sheet.onDelete(); closeSheet(); } break;
     case 'del-usual': remove('Abituali', id); refreshSettingsList(); break;
     case 'add-usual': {
       const inp = $('input[name=nuovo_abituale]');
-      if (inp && inp.value.trim()) { upsert('Abituali', { id: rid(), prodotto: inp.value.trim() }); inp.value = ''; refreshSettingsList(); }
+      const sel = $('select[name=nuova_cat]');
+      if (inp && inp.value.trim()) { state.lastCat = catValida(sel && sel.value) || 'Varie'; upsert('Abituali', { id: rid(), prodotto: inp.value.trim(), categoria: state.lastCat }); inp.value = ''; refreshSettingsList(); }
       break;
     }
     case 'set-color': {
@@ -752,6 +785,18 @@ document.addEventListener('change', ev => {
   if (t.dataset && t.dataset.act === 'unbuy') upsert('Spesa', { id: t.dataset.id, stato: 'da_comprare' });
 });
 
+// Aggiungi alla spesa: la casella filtra il catalogo mentre scrivi
+document.addEventListener('input', ev => {
+  const inp = ev.target;
+  if (!inp.matches || !inp.matches('form[data-form=spesa-add] input[name=prodotto]')) return;
+  const q = inp.value.trim().toLowerCase();
+  $$('#catalogo .catblk').forEach(sec => {
+    let any = false;
+    $$('.chipbtn', sec).forEach(b => { const hit = !q || b.dataset.p.toLowerCase().includes(q); b.hidden = !hit; any = any || hit; });
+    sec.hidden = !any;
+  });
+});
+
 document.addEventListener('submit', ev => {
   const form = ev.target.closest('form[data-form]');
   if (!form) return;
@@ -766,7 +811,17 @@ document.addEventListener('submit', ev => {
       refresh();
       break;
     }
-    case 'spesa-add': finito(f.prodotto || ''); break;
+    case 'spesa-add': {
+      const cat = catValida(f.categoria) || 'Varie';
+      const nome = (f.prodotto || '').trim();
+      if (!nome) break;
+      const known = state.data.abituali.some(a => a.prodotto.toLowerCase() === nome.toLowerCase());
+      state.lastCat = cat;
+      finito(nome, cat);
+      if (!known) upsert('Abituali', { id: rid(), prodotto: nome, categoria: cat }); // il nuovo prodotto entra nel catalogo
+      form.reset();
+      break;
+    }
     case 'sheet': if (state.sheet) { const s = state.sheet; closeSheet(); s.onSubmit(f); } break;
   }
 });

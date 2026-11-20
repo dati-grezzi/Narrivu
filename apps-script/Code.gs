@@ -18,8 +18,8 @@ const TABS = {
   Eventi:     ['id', 'titolo', 'data', 'ora', 'per', 'autore', 'note', 'creato', 'ora_fine'], // ora_fine in coda: i fogli esistenti restano validi
   Scadenze:   ['id', 'prodotto', 'scadenza', 'avviso_giorni', 'autore', 'creato', 'consumato', 'ultimo_avviso'],
   Promemoria: ['id', 'testo', 'quando', 'per', 'autore', 'creato', 'inviato'],
-  Spesa:      ['id', 'prodotto', 'stato', 'autore', 'creato', 'aggiornato'],
-  Abituali:   ['id', 'prodotto']
+  Spesa:      ['id', 'prodotto', 'stato', 'autore', 'creato', 'aggiornato', 'categoria'],
+  Abituali:   ['id', 'prodotto', 'categoria']
 };
 
 // Colonne che il client può scrivere (id e campi di servizio li gestisce il server)
@@ -27,11 +27,30 @@ const EDITABLE = {
   Eventi:     ['titolo', 'data', 'ora', 'ora_fine', 'per', 'autore', 'note'],
   Scadenze:   ['prodotto', 'scadenza', 'avviso_giorni', 'autore', 'consumato'],
   Promemoria: ['testo', 'quando', 'per', 'autore'],
-  Spesa:      ['prodotto', 'stato', 'autore'],
-  Abituali:   ['prodotto']
+  Spesa:      ['prodotto', 'stato', 'autore', 'categoria'],
+  Abituali:   ['prodotto', 'categoria']
 };
 
-const ABITUALI_INIZIALI = ['Latte', 'Pane', 'Uova', 'Pasta', 'Carta igienica', 'Detersivo piatti', 'Caffè', 'Frutta'];
+const CATEGORIE = ['Frutta', 'Verdura', 'Frigo', 'Carne', 'Pesce', 'Varie', 'Surgelati', 'Saponi e detersivi']; // ordine = giro del supermercato
+
+// Prodotti abituali per categoria (dalla lista di casa)
+const ABITUALI_INIZIALI = [
+  ['Frutta', ['Banane verdi', 'Pesche', 'Albicocche', 'Melone', 'Prugne']],
+  ['Verdura', ['Insalata', 'Cetrioli', 'Fagiolini', 'Patate', 'Aglio', 'Cipolle']],
+  ['Frigo', ['Pecorino', 'Yogurt per noi', 'Mozzarelle', 'Uova', 'Lemonsoda', 'Coca cola']],
+  ['Carne', ['Petto di pollo', 'Macinato', 'Hamburger']],
+  ['Pesce', ['Quello che è in offerta', 'Seppie', 'Orate', 'Salmone', 'Calamari']],
+  ['Varie', ['Latte', 'Crostatine', 'Pane in cassetta', 'Pane fresco', 'Pasta', 'Caffè', 'Carta igienica']],
+  ['Surgelati', ['Spinaci']],
+  ['Saponi e detersivi', ['Detersivo piatti']]
+];
+const ABITUALI_VECCHI = ['Latte', 'Pane', 'Uova', 'Pasta', 'Carta igienica', 'Detersivo piatti', 'Caffè', 'Frutta'];
+
+function abitualiRighe_() {
+  const out = [];
+  ABITUALI_INIZIALI.forEach(function (c) { c[1].forEach(function (p) { out.push([newId_(), p, c[0]]); }); });
+  return out;
+}
 
 /* ------------------------------------------------------------------ */
 /* Installazione                                                       */
@@ -60,8 +79,8 @@ function setup() {
 
   const ab = ss.getSheetByName('Abituali');
   if (ab.getLastRow() < 2) {
-    ab.getRange(2, 1, ABITUALI_INIZIALI.length, 2)
-      .setValues(ABITUALI_INIZIALI.map(function (p) { return [newId_(), p]; }));
+    const righe = abitualiRighe_();
+    ab.getRange(2, 1, righe.length, 3).setValues(righe);
   }
 
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
@@ -176,7 +195,7 @@ function listAll_() {
   return {
     ok: true,
     now: nowLocal_(),
-    config: { emailDestinatari: p.getProperty('EMAIL_DESTINATARI') || '', colori: parseJson_(p.getProperty('COLORI')) },
+    config: { categorie: CATEGORIE, emailDestinatari: p.getProperty('EMAIL_DESTINATARI') || '', colori: parseJson_(p.getProperty('COLORI')) },
     data: {
       eventi: readTab_('Eventi').filter(function (r) { return r.data >= from; }),
       scadenze: readTab_('Scadenze').filter(function (r) { return r.consumato !== 'si'; }),
@@ -209,8 +228,27 @@ function sheet_(name) {
   const cols = TABS[name];
   if (sh.getMaxColumns() < cols.length) sh.insertColumnsAfter(sh.getMaxColumns(), cols.length - sh.getMaxColumns());
   const head = sh.getRange(1, 1, 1, cols.length).getValues()[0];
-  for (let i = 0; i < cols.length; i++) if (head[i] !== cols[i]) sh.getRange(1, i + 1).setValue(cols[i]);
+  let nuovaCategoria = false;
+  for (let i = 0; i < cols.length; i++) if (head[i] !== cols[i]) { sh.getRange(1, i + 1).setValue(cols[i]); if (cols[i] === 'categoria') nuovaCategoria = true; }
+  if (name === 'Abituali' && nuovaCategoria) migraAbituali_(sh);
   return sh;
+}
+
+/** Una volta sola, quando arriva la colonna «categoria»: se l'elenco è ancora quello iniziale lo sostituisce
+ *  con il nuovo catalogo; se l'avete già personalizzato lo lascia e assegna le categorie note (le altre in «Varie»). */
+function migraAbituali_(sh) {
+  const last = sh.getLastRow();
+  const cur = last < 2 ? [] : sh.getRange(2, 1, last - 1, 2).getValues().filter(function (v) { return v[0] !== ''; });
+  const intatto = cur.every(function (v) { return ABITUALI_VECCHI.indexOf(String(v[1])) >= 0; });
+  if (intatto) {
+    for (let r = last; r >= 2; r--) sh.deleteRow(r);
+    const righe = abitualiRighe_();
+    sh.getRange(2, 1, righe.length, 3).setValues(righe);
+    return;
+  }
+  const nota = {};
+  ABITUALI_INIZIALI.forEach(function (c) { c[1].forEach(function (p) { nota[p.toLowerCase()] = c[0]; }); });
+  cur.forEach(function (v, i) { sh.getRange(i + 2, 3).setValue(nota[String(v[1]).toLowerCase()] || 'Varie'); });
 }
 
 function readTab_(name) {
@@ -334,6 +372,9 @@ function sanitize_(tab, row) {
         break;
       case 'autore':
         if (AUTORI.indexOf(v) < 0) throw new Error('Autore non valido');
+        break;
+      case 'categoria':
+        if (CATEGORIE.indexOf(v) < 0) throw new Error('Categoria non valida');
         break;
       case 'stato':
         if (STATI_SPESA.indexOf(v) < 0) throw new Error('Stato non valido');

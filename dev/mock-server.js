@@ -46,14 +46,17 @@ const db = {
     { id: id(), testo: 'Iscrizione al corso', quando: day(3) + 'T18:00', per: 'Lucia', autore: 'Lucia', creato: now(), inviato: '' }
   ],
   spesa: [
-    { id: id(), prodotto: 'Latte', stato: 'da_comprare', autore: 'Lucia', creato: now(), aggiornato: now() },
-    { id: id(), prodotto: 'Pane', stato: 'da_comprare', autore: 'Alfio', creato: now(), aggiornato: now() },
+    { id: id(), prodotto: 'Latte', categoria: 'Varie', stato: 'da_comprare', autore: 'Lucia', creato: now(), aggiornato: now() },
+    { id: id(), prodotto: 'Pane fresco', categoria: 'Varie', stato: 'da_comprare', autore: 'Alfio', creato: now(), aggiornato: now() },
     { id: id(), prodotto: 'Detersivo piatti', stato: 'da_comprare', autore: 'Lucia', creato: now(), aggiornato: now() },
-    { id: id(), prodotto: 'Pomodori', stato: 'da_comprare', autore: 'Lucia', creato: now(), aggiornato: now() },
-    { id: id(), prodotto: 'Crocchette per Zaja', stato: 'da_comprare', autore: 'Alfio', creato: now(), aggiornato: now() },
+    { id: id(), prodotto: 'Insalata', categoria: 'Verdura', stato: 'da_comprare', autore: 'Lucia', creato: now(), aggiornato: now() },
+    { id: id(), prodotto: 'Salmone', categoria: 'Pesce', stato: 'da_comprare', autore: 'Alfio', creato: now(), aggiornato: now() },
     { id: id(), prodotto: 'Caffè', stato: 'comprato', autore: 'Alfio', creato: now(), aggiornato: now() }
   ],
-  abituali: ['Latte', 'Pane', 'Uova', 'Pasta', 'Carta igienica', 'Detersivo piatti', 'Caffè', 'Frutta'].map(p => ({ id: id(), prodotto: p }))
+  abituali: [['Frutta', ['Banane verdi', 'Pesche', 'Albicocche', 'Melone', 'Prugne']], ['Verdura', ['Insalata', 'Cetrioli', 'Fagiolini', 'Patate', 'Aglio', 'Cipolle']],
+    ['Frigo', ['Pecorino', 'Yogurt per noi', 'Mozzarelle', 'Uova', 'Lemonsoda', 'Coca cola']], ['Carne', ['Petto di pollo', 'Macinato', 'Hamburger']],
+    ['Pesce', ['Quello che è in offerta', 'Seppie', 'Orate', 'Salmone', 'Calamari']], ['Varie', ['Latte', 'Crostatine', 'Pane in cassetta', 'Pane fresco', 'Pasta', 'Caffè', 'Carta igienica']],
+    ['Surgelati', ['Spinaci']], ['Saponi e detersivi', ['Detersivo piatti']]].flatMap(([c, l]) => l.map(p => ({ id: id(), prodotto: p, categoria: c })))
 };
 
 function sanitize(tab, row) {
@@ -61,8 +64,8 @@ function sanitize(tab, row) {
     Eventi: ['titolo', 'data', 'ora', 'ora_fine', 'per', 'autore', 'note'],
     Scadenze: ['prodotto', 'scadenza', 'avviso_giorni', 'autore', 'consumato'],
     Promemoria: ['testo', 'quando', 'per', 'autore'],
-    Spesa: ['prodotto', 'stato', 'autore'],
-    Abituali: ['prodotto']
+    Spesa: ['prodotto', 'stato', 'autore', 'categoria'],
+    Abituali: ['prodotto', 'categoria']
   }[tab];
   if (!ok) throw new Error('Tab non valida');
   const out = {};
